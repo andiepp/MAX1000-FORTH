@@ -97,8 +97,9 @@ header and checks the whole text against its CRC (`source?`). A 49 KB file takes
 is mostly UART time.
 
 **Boot.** `cold` resets the dictionary and prints the banner. Then `autoload` checks the
-header and the CRC; if autostart is on, it waits up to 200 ms for an ESC, also looks at the
-user button, and either skips or calls `load-source`. `load-source` starts a flash read and
+header and the CRC; if autostart is on, it waits up to 200 ms for an ESC, then looks at the
+user button, and either skips or calls `load-source`. The button has to be read after that
+wait: it is sampled every 10 ms and reads "not pressed" until the first sample. `load-source` starts a flash read and
 sets `fsrc` to the length. From then on `key` takes its bytes from the flash, and
 `accept-line` and `quit` print neither echo nor `ok`. When the last byte is read, the flash
 is deselected; if that byte was not a CR, `key` supplies one. `abort` stops a running load

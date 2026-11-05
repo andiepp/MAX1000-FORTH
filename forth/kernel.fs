@@ -277,7 +277,8 @@ variable soff
   until drop 0 ;
 : autoload ( -- )
   source? 0= if exit then hdr 12 + @ 1 and 0= if exit then
-  btn@ esc? or if ."  autostart skipped" cr exit then
+  esc? btn@ or if ."  autostart skipped" cr exit then   \ btn@ after the wait:
+  \ the button is sampled every 10 ms and reads "not pressed" until the first sample
   load-source ;
 
 \ ---------------------------------------------------------------------------
