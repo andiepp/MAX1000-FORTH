@@ -12,7 +12,7 @@
 //   +8  read: CRC-32 bits 15..0                           (standard CRC-32: reflected,
 //   +A  read: CRC-32 bits 31..16                           poly 0xEDB88320, init/xorout ~0)
 //
-// SPI mode 0, SCK = clk / 4 (10 MHz at 40 MHz). MOSI changes after the falling edge, MISO is
+// SPI mode 0, SCK = clk / 6 (8 MHz at 48 MHz; the LIS3DH allows 10 MHz). MOSI changes after the falling edge, MISO is
 // taken at the rising edge.
 
 `default_nettype none
@@ -42,7 +42,7 @@ module spi_flash (
 
     reg  [7:0] shreg = 8'd0;
     reg  [3:0] nbits = 4'd0;
-    reg        half  = 1'b0;
+    reg  [1:0] half  = 2'd0;     // clocks in the current half period (3 per half)
     reg        rx_bit = 1'b0;
     wire       busy  = nbits != 4'd0;
     reg [31:0] crc   = 32'hFFFF_FFFF;
@@ -68,7 +68,7 @@ module spi_flash (
             sck_r <= 1'b0;
             shreg <= 8'd0;
             nbits <= 4'd0;
-            half  <= 1'b0;
+            half  <= 2'd0;
             crc   <= 32'hFFFF_FFFF;
         end else begin
             if (we)
@@ -76,7 +76,7 @@ module spi_flash (
                     3'd0: if (!busy) begin
                         shreg <= wdata[7:0];
                         nbits <= 4'd8;
-                        half  <= 1'b0;
+                        half  <= 2'd0;
                         sck_r <= 1'b0;
                     end
                     3'd1: begin
@@ -89,8 +89,8 @@ module spi_flash (
                 endcase
 
             if (busy) begin
-                half <= !half;
-                if (half) begin
+                half <= (half == 2'd2) ? 2'd0 : half + 2'd1;
+                if (half == 2'd2) begin
                     if (!sck_r) begin
                         sck_r  <= 1'b1;
                         rx_bit <= miso_sel;
