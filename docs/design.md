@@ -11,7 +11,7 @@ document covers what is different on the MAX1000.
 | Clock | 12 MHz oscillator → PLL: c1 = 40 MHz CPU clock (12 × 10 / 3), c0 = 10 MHz for the ADC |
 | Reset | held until the PLL locks, plus 255 clocks; **Ctrl-R** (0x12) from the host resets the CPU, FIFOs and I/O (the byte is not passed on). The RAM keeps its contents; `cold` restores `dp`/`latest` from `dp0`/`latest0` (set by the cross-compiler), so the dictionary is the kernel's again |
 | RAM | 8K × 16 as two 8K × 8 halves in M9K blocks (byte stores without byte enables); port A fetches instructions, port B is the data port. Both halves are initialized from `build/forth_lo.hex` / `forth_hi.hex` |
-| UART | 115200 8N1 on FTDI channel B (FPGA TX = B4, RX = A4), 1 KB RX and TX FIFOs in M9K |
+| UART | 115200 8N1 on FTDI channel B (FPGA TX = B4, RX = A4); RX FIFO 16 KB, TX FIFO 1 KB, in M9K. The large RX FIFO takes a whole `store` payload while the flash erases |
 | Stacks | Quartus maps the 32-entry data and return stacks into M9K blocks (the read address is a register) |
 
 There is no ARM or soft processor: the kernel image is in the configuration (flash mode
@@ -29,11 +29,13 @@ Address bit 15 selects I/O; only bits 7..1 are decoded.
 | Address | Read | Write |
 |---|---|---|
 | 0x8000 | next received byte (pops the RX FIFO) | send byte (pushes the TX FIFO) |
-| 0x8002 | bit 0 = RX byte available, bit 1 = TX FIFO has space | – |
+| 0x8002 | bit 0 = RX byte available, bit 1 = TX FIFO has space, bit 2 = TX idle (FIFO empty, last byte sent) | – |
 | 0x8004 | user LEDs (8 bits, bit 0 = LED1) | same |
 | 0x8006 | bit 0 = user button pressed (sampled every 10 ms) | – |
+| 0x8008 | – | any value: reset the CPU (as Ctrl-R) |
 | 0x800A | millisecond counter (wraps) | – |
 | 0x800C | next received byte without taking it (peek) | – |
+| 0x800E | bytes waiting in the RX FIFO | – |
 | 0x8010 + 8p | port p (0..1) pin levels, synchronized | – |
 | 0x8012 + 8p | port p output latch | same |
 | 0x8014 + 8p | port p direction, 1 = output (0 after reset) | same |
@@ -108,6 +110,37 @@ saved source must not use the flash words itself, except on its last line.
 
 Tests: `sim/run_flash_tests.ps1` runs 21 checks in the instruction-set simulator, which
 models the W25Q64 commands and the CRC unit (`tools/hf16.py run --flash image --button`).
+
+## Service requests (the app)
+
+The ZYNQ-FORTH app talks protocol 1 (ZYNQ-FORTH `docs/Protocol.md`): a request is SOH, a
+line, LF; the answer is `SOH ok <name> <length> LF <payload>` or `SOH err <name> <reason>
+LF`; a 0x01 in Forth's own output is sent twice. On the Zynq the ARM answers; here the
+kernel does.
+
+**Where.** Requests arrive in the RX FIFO between terminal bytes. `service?` answers every
+request at the head of the FIFO. `key?` calls it and decides on the head byte itself (peek
+at 0x800C), so a SOH can never be taken as terminal input. `key`, `ms` and the wait in
+`emit` go through `key?`/`service?`, so answers come at the prompt and whenever a program
+waits, polls `key?` or prints. A request queued behind terminal input waits until Forth has
+read that input. `serving` keeps an answer from starting another one.
+
+**Answers.** `answer ( xt -- )` runs the payload word twice: once with `counting` set,
+where `emit` only counts bytes, then for real after the header with the length. `source`
+uses the stored length directly (`answer-n`). The request line is read with a 2 s timeout
+per byte; an unfinished one is dropped.
+
+| Request | MAX1000-FORTH |
+|---|---|
+| `echo`, `words`, `stack`, `source`, `erase`, `autostart on\|off` | as ZYNQ-FORTH |
+| `version` | `firmware max1000-forth 1.0`, `protocol 1`, `kernel <cells> <sum hex>` (KCHECK, set by the cross-compiler) |
+| `status` | as ZYNQ-FORTH; `pc` is always 0000; `input` = RX FIFO bytes plus the rest of a saved source being read; the source fields come from the state cached at the last start/store/erase/autostart |
+| `board` | `board` (bits 7..0 LEDs, bit 16 user button), `ports` (2 words: pins 0–15, 16–31; levels, driven), `pwm` (as ZYNQ-FORTH), `adc` (9 codes, channels 0..8) |
+| `store <len> <crc> on\|off` | erases the header, then 4 KB sectors as the payload arrives; refuses `args`, `timeout` (2 s without a byte), `crc`, `flash` |
+| `restart [skip]` | answers, waits for TX idle, sets `skip1` and resets the CPU via 0x8008. The app uses Ctrl-R (+ESC) instead, which also works during a tight loop |
+
+There is no HASE mode. Tests: `sim/test_protocol.py` (34 checks against the ISS, which
+models the RX count, the TX idle bit and the CPU reset).
 
 ## Board facts
 

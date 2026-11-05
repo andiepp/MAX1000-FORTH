@@ -16,9 +16,25 @@ directly to the board's USB serial port.
                                                                        └─ SPI flash (8 MB): saved source + autostart
 ```
 
-Status: phases 1 and 2 work on the board (2026-11-05). You get an interactive Forth with
-digital I/O, PWM and ADC words, and a source saved in the serial flash that runs at power-up.
-Not there yet: the ZYNQ-FORTH app's service requests (phase 3).
+Status: phases 1 to 3 work on the board (2026-11-05):
+- an interactive Forth with digital I/O, PWM and ADC words;
+- a source saved in the serial flash that runs at power-up;
+- the ZYNQ-FORTH app as front end, with the terminal, editor, dictionary, data stack,
+  saved source and a live MAX1000 board view.
+
+![The ZYNQ-FORTH app with the MAX1000 running examples/bench.fs](docs/images/app-max1000.png)
+
+## The app
+
+The [ZYNQ-FORTH](https://github.com/andiepp/ZYNQ-FORTH) app (from its `main` after
+2.3) recognises MAX1000-FORTH by the `version` answer. Connect it to the board's COM port
+and it shows the MAX1000 board view instead of the Arty one, with no Pattern tab.
+
+The kernel answers the app's service requests itself (protocol 1 of ZYNQ-FORTH,
+docs/design.md). It does so at the prompt and whenever a program waits in `ms`, polls
+`key?`, reads `key` or prints. A program that only computes (no `ms`, `key?` or output)
+gets no answers until it ends: the app then shows "no answer". **Restart** in the app
+sends Ctrl-R, which the hardware handles at any time.
 
 ## Using it
 
@@ -110,12 +126,13 @@ quartus_pgm -c 1 -m JTAG -o "p;build/output_files/max1000_forth.sof"         # S
 quartus_pgm -c 1 -m JTAG -o "p;build/output_files/max1000_forth.pof"         # internal flash
 python tools/hf16.py run forth/kernel.fs -i "2 3 + ."                       # kernel in the simulator
 sim/run_flash_tests.ps1                                                      # saved-source tests (simulator)
+python sim/test_protocol.py                                                  # service-request tests (simulator)
 ```
 
 `build.ps1` finds Quartus via `-Quartus`, `QUARTUS_ROOTDIR` or `<drive>:\Quartus\18.1\quartus`.
-Resources: about 4.0k of 8,064 logic elements, 149 kbit of RAM, 18 multiplier elements;
-40 MHz with about 2.7 ns of slack at the slow corner. The kernel takes 6.4 KB of the 16 KB
-RAM.
+Resources: about 4.0k of 8,064 logic elements, 272 kbit of RAM (70%: 16 KB for Forth,
+16 KB receive FIFO), 18 multiplier elements; 40 MHz with about 1.7 ns of slack at the slow
+corner. The kernel takes 9.7 KB of the 16 KB RAM, which leaves about 6.5 KB for your words.
 
 ## Layout
 
@@ -128,6 +145,7 @@ RAM.
 | `rtl/adc_scan.v` | ADC scanner around Intel's Modular ADC control core |
 | `rtl/spi_flash.v` | SPI master for the serial flash, CRC-32 unit |
 | `sim/run_flash_tests.ps1` | simulator tests of the flash words and the saved source |
+| `sim/test_protocol.py` | simulator tests of the service requests the app sends |
 | `forth/kernel.fs` | the Forth kernel (ZYNQ-FORTH kernel with MAX1000 board words) |
 | `tools/hf16.py` | cross-compiler and instruction-set simulator |
 | `tools/mforth.py` | serial line sender |
