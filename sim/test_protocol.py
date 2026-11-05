@@ -129,6 +129,15 @@ check('board at start', bd['board'] == ['00000001'] and bd['pwm'] == ['00000000'
       and len(bd['ports']) == 2 and len(bd['adc']) == 9 and bd['adc'][1] == '0800'
       and bd['adc'][8] == '0FFF', pl)
 
+check('board: temperature and acceleration', bd.get('temp') == ['0E38']
+      and bd.get('accel') == ['0000', '0000', '03E8'], pl)
+
+# 24 KB RAM: data RAM up to 0x5FFF, stores above it are ignored; BUFFER: hands out data RAM
+term = b.type('$5BFE @ . 1234 $5BFE ! $5BFE @ . 99 $6000 ! $6000 @ .')
+check('data RAM and its end', '1234 0' in term, term)
+term = b.type('20 buffer: buf  buf . unused-data .')
+check('buffer:', '16384 7148' in term, term)
+
 b.type('3 output 3 high 1000 0 pwm-hz 500 0 pwm-duty 5 0 pwm-pin $a5 led!')
 head, pl = one(b.request('board')[1])
 bd = lines(pl)

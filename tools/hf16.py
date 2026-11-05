@@ -19,7 +19,8 @@ import os
 import re
 import sys
 
-RAM_BYTES = 16384
+RAM_BYTES = 16384        # code and the dictionary (jumps and calls reach 16 KB)
+MEM_BYTES = 24576        # the whole RAM: 0x4000..0x5FFF is data only
 
 # ---------------------------------------------------------------------------
 # Instruction encoding
@@ -424,7 +425,11 @@ PIN_IDLE = 0x0000_0040
 
 # Simulated ADC codes by ADC channel (12 bits, 3.3 V full scale): CH1 = AIN3 = the
 # bench potentiometer at 1.65 V, CH8 = AIN0 at 3.3 V, the rest 0 V.
-ADC_SIM = {1: 2048, 8: 4095}
+ADC_SIM = {1: 2048, 8: 4095, 9: 3640}     # slot 9: the temperature diode, about 34.6 C
+
+# LIS3DH model: WHO_AM_I and the output registers (X = 0, Y = 0, Z = 1000 mg, 12 bits
+# left-justified); other registers keep what is written
+ACC_SIM = {0x0F: 0x33, 0x28: 0x00, 0x29: 0x00, 0x2A: 0x00, 0x2B: 0x00, 0x2C: 0x80, 0x2D: 0x3E}
 
 # Serial flash model (W25Q64): JEDEC ID, status, write enable, read, page program,
 # 4 KB / 64 KB erase. FLASH_SAVE bytes are kept in the --flash image file.
@@ -434,7 +439,7 @@ FLASH_SAVE = 0x20000
 
 class Machine:
     def __init__(self, mem, rx=b''):
-        self.mem = bytearray(mem)
+        self.mem = bytearray(mem) + bytearray(MEM_BYTES - len(mem))
         self.pc = 0
         self.t = 0
         self.dsp = 0
@@ -457,6 +462,10 @@ class Machine:
             self.adc[ch] = value
         self.flash = bytearray(b'\xff' * FLASH_BYTES)
         self.spi_cs = False
+        self.acc_cs = False
+        self.acc = dict(ACC_SIM)
+        self.acc_n = 0
+        self.acc_addr = 0
         self.spi_rx = 0
         self.wel = False
         self.fl = {'n': 0, 'cmd': 0, 'addr': 0}
@@ -526,10 +535,25 @@ class Machine:
                 self.flash[a] &= b
         return 0xFF
 
+    def acc_xfer(self, b):
+        """LIS3DH: the first byte is the register address (bit 7 read, bit 6 auto-increment)."""
+        n = self.acc_n
+        self.acc_n += 1
+        if n == 0:
+            self.acc_addr = b
+            return 0xFF
+        reg = (self.acc_addr & 0x3F) + ((n - 1) if self.acc_addr & 0x40 else 0)
+        if self.acc_addr & 0x80:
+            return self.acc.get(reg, 0)
+        self.acc[reg] = b
+        return 0xFF
+
     def rd16(self, a):
         if a & 0x8000:
             return self.io_read(a)
-        a &= 0x3FFE
+        a &= 0x7FFE
+        if a >= MEM_BYTES:
+            return 0
         return self.mem[a] | (self.mem[a + 1] << 8)
 
     def io_read(self, a):
@@ -545,7 +569,7 @@ class Machine:
             return ((vec & PIN_EXISTS) >> shift) & 0xFFFF
         if a & 0xF0 == 0x20:
             reg = (a >> 1) & 7
-            return {0: self.spi_rx, 1: int(self.spi_cs), 4: self.crc & 0xFFFF,
+            return {0: self.spi_rx, 1: int(self.spi_cs) | (4 if self.acc_cs else 0), 4: self.crc & 0xFFFF,
                     5: self.crc >> 16}.get(reg, 0)
         if a & 0xF0:
             return 0
@@ -588,9 +612,12 @@ class Machine:
             if a & 0xF0 == 0x20:
                 reg = (a >> 1) & 7
                 if reg == 0:
-                    self.spi_rx = self.spi_xfer(v & 0xFF)
+                    self.spi_rx = self.acc_xfer(v & 0xFF) if self.acc_cs else self.spi_xfer(v & 0xFF)
                 elif reg == 1:
                     self.spi_select(bool(v & 1))
+                    if (v & 2) and not self.acc_cs:
+                        self.acc_n = 0
+                    self.acc_cs = bool(v & 2)
                 elif reg == 2:
                     self.crc = 0
                 elif reg == 3:
@@ -607,11 +634,13 @@ class Machine:
             elif reg == 4:
                 self.restart_pending = True
             return
-        a &= 0x3FFF
+        a &= 0x7FFF
+        if a >= MEM_BYTES:
+            return
         if byte:
             self.mem[a] = v & 0xFF
         else:
-            a &= 0x3FFE
+            a &= 0x7FFE
             self.mem[a] = v & 0xFF
             self.mem[a + 1] = (v >> 8) & 0xFF
 
@@ -720,7 +749,7 @@ class Machine:
 
 def write_outputs(comp, size, base):
     os.makedirs(os.path.dirname(base) or '.', exist_ok=True)
-    words = [comp.cell(a) for a in range(0, RAM_BYTES, 2)]
+    words = [comp.cell(a) for a in range(0, RAM_BYTES, 2)] + [0] * ((MEM_BYTES - RAM_BYTES) // 2)
     with open(base + '.hex', 'w') as f:
         for w in words:
             f.write(f'{w:04x}\n')

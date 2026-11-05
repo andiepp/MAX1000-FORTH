@@ -18,8 +18,10 @@ module pwm #(
     input  wire                  clk,
     input  wire                  rst,
     input  wire                  we,          // a CPU store to this block
-    input  wire [1:0]            ch_sel,      // mem_addr[4:3]
-    input  wire [1:0]            reg_sel,     // mem_addr[2:1]
+    input  wire [1:0]            ch_sel,      // mem_addr[4:3] of a store
+    input  wire [1:0]            reg_sel,     // mem_addr[2:1] of a store
+    input  wire [1:0]            rd_ch,       // the same for reads (MAX1000: the registered
+    input  wire [1:0]            rd_reg,      // read address, io_addr)
     input  wire [15:0]           wdata,
     output reg  [15:0]           rdata,       // combinational read of the addressed register
     output wire [CHANNELS-1:0]   enable,
@@ -53,11 +55,11 @@ module pwm #(
     end
 
     always @* begin
-        case (reg_sel)
-            2'd0: rdata = period[ch_sel][15:0];
-            2'd1: rdata = period[ch_sel][31:16];
-            2'd2: rdata = duty[ch_sel];
-            default: rdata = control[ch_sel];
+        case (rd_reg)
+            2'd0: rdata = period[rd_ch][15:0];
+            2'd1: rdata = period[rd_ch][31:16];
+            2'd2: rdata = duty[rd_ch];
+            default: rdata = control[rd_ch];
         endcase
     end
 

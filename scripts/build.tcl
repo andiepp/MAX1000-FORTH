@@ -31,6 +31,7 @@ set_global_assignment -name RESERVE_ALL_UNUSED_PINS_WEAK_PULLUP "AS INPUT TRI-ST
 set_global_assignment -name INTERNAL_FLASH_UPDATE_MODE "SINGLE IMAGE WITH ERAM"
 
 foreach f {max1000_forth.v hf16_cpu.v fifo_bram.v uart.v pwm.v adc_scan.v spi_flash.v} {
+    # (spi_flash.v drives the serial flash and the LIS3DH accelerometer)
     set_global_assignment -name VERILOG_FILE [file join $root rtl $f]
 }
 
@@ -56,12 +57,22 @@ set pins {
     PIO[0]   M3   PIO[1]   L3   PIO[2]   M2   PIO[3]   M1
     PIO[4]   N3   PIO[5]   N2   PIO[6]   K2   PIO[7]   K1
     F_S      B3   F_CLK    A3   F_DI     A2   F_DO     B2
+    SEN_CS   L5   SEN_SPC  J6   SEN_SDI  J7   SEN_SDO  K5
 }
 foreach {sig pin} $pins {
     set_location_assignment PIN_$pin -to $sig
     set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to $sig
 }
 set_instance_assignment -name IO_STANDARD "3.3 V SCHMITT TRIGGER" -to USER_BTN
+
+# Weak pull-ups on D0..D14 and PIO1..PIO8 (build.ps1 -PullUps). The MAX 10 sets them in
+# the configuration; Forth cannot switch them. Off by default: with the bench's LEDs on
+# D3..D5 (1 k to GND) a pull-up would leave them faintly lit while the pin is an input.
+if {[info exists ::env(MAX1000_PULLUPS)] && $::env(MAX1000_PULLUPS) eq "1"} {
+    puts "weak pull-ups on D\[*\] and PIO\[*\]"
+    set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to D[*]
+    set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to PIO[*]
+}
 
 export_assignments
 

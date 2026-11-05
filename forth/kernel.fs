@@ -122,7 +122,13 @@ variable >in
 variable #tib
 variable 'a
 variable 'n
-create tib 82 allot
+\ RAM 0x0000..0x3FFF holds code and data, 0x4000..0x5FFF data only (jumps and
+\ calls reach 16 KB). The kernel's buffers sit at the top of the data RAM; BUFFER:
+\ hands out the rest, 0x4000..0x5BFF.
+$5D00 constant tib       \ 82 bytes: the input line
+$4000 constant data0     \ the data RAM BUFFER: hands out
+$5C00 constant data-end
+variable dp2             \ next free byte of the data RAM (COLD resets it)
 
 : here ( -- a ) dp @ ;
 : allot ( n -- ) dp +! ;
@@ -185,17 +191,17 @@ create tib 82 allot
 
 \ ---------------------------------------------------------------------------
 \ PWM: four channels at $8080 + 8c, each on any pin. The period counts
-\ 40 MHz clocks (32 bits), the duty is a fraction in 1/65536 (rtl/pwm.v).
+\ 48 MHz clocks (32 bits), the duty is a fraction in 1/65536 (rtl/pwm.v).
 \ ---------------------------------------------------------------------------
 
 : pwm ( ch -- a ) dup 4 u< 0= if ."  bad channel" cr abort then 3 lshift $8080 + ;
 : pwm-clocks ( ud ch -- ) pwm rot over ! 2 + ! ;
 : ud/u ( ud u -- ud' ) >r 0 r@ um/mod r> swap >r um/mod nip r> ;
 : pwm-hz ( u ch -- )
-  over 0= if ."  bad frequency" cr abort then >r >r $5A00 $0262 r> ud/u r> pwm-clocks ;
+  over 0= if ."  bad frequency" cr abort then >r >r $6C00 $02DC r> ud/u r> pwm-clocks ;
 : pwm-khz ( u ch -- )
-  over 1 20001 within 0= if ."  bad frequency" cr abort then
-  >r >r 40000 0 r> um/mod nip 0 r> pwm-clocks ;
+  over 1 24001 within 0= if ."  bad frequency" cr abort then
+  >r >r 48000 0 r> um/mod nip 0 r> pwm-clocks ;
 : pwm-duty ( permille ch -- ) >r 0 max 1000 min 65535 um* 1000 um/mod nip r> pwm 4 + ! ;
 : pwm-pin ( pin ch -- ) >r dup pin 2drop $8000 or r> pwm 6 + ! ;
 : pwm-off ( ch -- ) pwm 6 + 0 swap ! ;
@@ -212,6 +218,30 @@ create ain 8 c, 2 c, 5 c, 1 c, 3 c, 4 c, 7 c, 6 c, 0 c,
 : adc@ ( n -- u )
   dup 9 u< 0= if ."  bad input" cr abort then ain + c@ adc-ch@ ;
 : mv@ ( n -- mv ) adc@ 3300 4096 */ ;
+\ The temperature sensing diode: a running average of 64 samples in slot 9. Its code
+\ falls as the chip warms; TEMP@ interpolates between two points of Intel's table
+\ (-40 C = 3798, 96 C = 3510), so it is approximate.
+: temp-code@ ( -- u ) 9 adc-ch@ ;
+: temp@ ( -- n ) 3798 temp-code@ - 1360 288 */ 400 - ;     \ tenths of a degree C
+: .temp ( -- )
+  temp@ dup 0< if 45 emit negate then 10 u/mod (u.) 46 emit (u.) ."  C " ;
+
+\ ---------------------------------------------------------------------------
+\ LIS3DH accelerometer on its own SPI pins (the flash's SPI master, select bit 1
+\ at $8022). ACCEL-ON (run by COLD): 100 Hz, X/Y/Z, block update, high
+\ resolution, +-2 g, so one digit is 1 mg.
+\ ---------------------------------------------------------------------------
+
+: acc-sel ( -- ) 2 $8022 ! ;
+: acc-end ( -- ) 0 $8022 ! ;
+: acc@ ( reg -- c ) acc-sel $80 or spi drop 0 spi acc-end ;
+: acc! ( c reg -- ) acc-sel spi drop spi drop acc-end ;
+: accel? ( -- f ) $0F acc@ $33 = ;                \ WHO_AM_I answers $33
+: accel-on ( -- ) $57 $20 acc! $88 $23 acc! ;
+: mg ( lo hi -- mg ) 8 lshift or 2/ 2/ 2/ 2/ ;    \ 12 bits, left-justified
+: accel@ ( -- x y z )
+  acc-sel $E8 spi drop                          \ read OUT_X_L.. with auto-increment
+  0 spi 0 spi mg 0 spi 0 spi mg 0 spi 0 spi mg acc-end ;
 
 \ ---------------------------------------------------------------------------
 \ Serial flash (Winbond W25Q64, 8 MB) through the SPI master at $8020 and the
@@ -247,8 +277,8 @@ create ain 8 c, 2 c, 5 c, 1 c, 3 c, 4 c, 7 c, 6 c, 0 c,
 \ unless the user button is held or an ESC arrives within 200 ms.
 \ ---------------------------------------------------------------------------
 
-create hdr 16 allot
-create pbuf 256 allot
+$5E10 constant hdr      \ 16 bytes: the saved source's header
+$5C00 constant pbuf     \ 256 bytes: one flash page
 variable fsrc        \ bytes of saved source still to be read by KEY
 variable fcr         \ KEY owes a CR (the source did not end in one)
 variable slen
@@ -336,7 +366,7 @@ variable dl
 \ <reason> LF". The payload is generated twice: once to count it, once to send.
 \ ---------------------------------------------------------------------------
 
-create rq 64 allot
+$5D60 constant rq       \ 64 bytes: a service request
 variable rq#         \ request length
 variable rq>         \ parse position
 variable rqn-a       \ request name
@@ -425,7 +455,9 @@ variable pp
   ." board " led@ $FF and btn@ 1 and hex8 lf
   ." ports " 0 port-word hex8 space 1 port-word hex8 lf
   ." pwm " pwm-word hex8 lf
-  ." adc" 9 0 do space i adc-ch@ hex4 loop lf ;
+  ." adc" 9 0 do space i adc-ch@ hex4 loop lf
+  ." temp " temp-code@ hex4 lf
+  ." accel " accel@ rot hex4 space swap hex4 space hex4 lf ;
 : p-source ( -- )
   s-len @ 0 1 f-read begin dup while 0 spi emit 1- repeat drop f-end ;
 : tx-idle ( -- ) begin $8002 @ 4 and until ;
@@ -473,7 +505,10 @@ variable pp
   $8000 @ drop -1 serving !
   rq-line if 0 rq> ! rq-word rqn-n ! rqn-a ! dispatch then
   0 serving ! ;
-: service? ( -- ) serving @ if exit then begin soh? while serve repeat ;
+: service? ( -- )
+  serving @ if exit then
+  fsrc @ fcr @ or if exit then      \ the saved source is being read from the flash
+  begin soh? while serve repeat ;
 
 \ ---------------------------------------------------------------------------
 \ Output
@@ -491,13 +526,20 @@ variable pp
 : . ( n -- ) dup 0< if 45 emit negate then u. ;
 \ .S parks the stack in SBUF (not on the 32-deep return stack), prints it
 \ bottom first and pushes it back
-create sbuf 64 allot
+$5DA0 constant sbuf     \ 64 bytes: .S parks the stack here
 variable sn
 : .s ( -- )
   depth dup sn ! 60 emit (u.) 62 emit space
   sn @ begin dup while 1- swap over cells sbuf + ! repeat drop
   sn @ 0 begin 2dup > while dup cells sbuf + @ dup . -rot 1+ repeat 2drop ;
 : ? ( a -- ) @ . ;
+
+\ Free code space (below 0x4000) and data RAM; BUFFER: name gives n bytes of data RAM
+: unused ( -- n ) $4000 here - ;
+: unused-data ( -- n ) data-end dp2 @ - ;
+: buffer: ( n "name" -- )
+  dup unused-data u> if drop ."  data RAM full" cr abort then
+  dp2 @ swap dp2 +! constant ;
 
 \ ---------------------------------------------------------------------------
 \ Parsing
@@ -661,7 +703,7 @@ variable sn
 
 \ SNAP copies the data stack into SSNAP (bottom first) before each line, for the
 \ app's stack view. SDEPTH is -1 while the copy is in progress.
-create ssnap 40 allot
+$5DE0 constant ssnap    \ 40 bytes: the stack at the last prompt (stack request)
 variable sdepth
 : snap ( -- )
   -1 sdepth ! depth dup >r
@@ -675,7 +717,7 @@ variable sdepth
 
 : cold ( -- )
   dp0 @ dp ! latest0 @ latest ! 0 fsrc ! 0 fcr ! 0 serving ! 0 counting !
-  1 starts +!
+  1 starts +! data0 dp2 ! accel-on
   decimal 0 state !
   cr ." HF16 Forth on MAX1000" cr
   1 led!

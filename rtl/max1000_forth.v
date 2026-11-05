@@ -6,10 +6,11 @@
 `default_nettype none
 
 module max1000_forth #(
-    // CPU clock = 12 MHz * PLL_MUL / PLL_DIV = 40 MHz (48 MHz misses timing by ~0.7 ns:
-    // stack RAM -> multiplier -> ALU -> next address -> I/O decode)
-    parameter integer PLL_MUL = 10,
-    parameter integer PLL_DIV = 3,
+    // CPU clock = 12 MHz * PLL_MUL / PLL_DIV = 48 MHz. The I/O read multiplexer works on
+    // the registered address (io_addr), so it is not behind the stack RAM -> multiplier ->
+    // ALU -> next address path.
+    parameter integer PLL_MUL = 4,
+    parameter integer PLL_DIV = 1,
     parameter integer BAUD    = 115_200,
     parameter         INIT_LO = "forth_lo.hex",   // kernel image, low bytes of each cell
     parameter         INIT_HI = "forth_hi.hex"    //               high bytes
@@ -24,7 +25,11 @@ module max1000_forth #(
     output wire        F_S,          // serial flash: chip select (low active)
     output wire        F_CLK,        //               clock
     output wire        F_DI,         //               data into the flash
-    input  wire        F_DO          //               data out of the flash
+    input  wire        F_DO,         //               data out of the flash
+    output wire        SEN_CS,       // LIS3DH accelerometer: chip select (low active)
+    output wire        SEN_SPC,      //                       clock
+    output wire        SEN_SDI,      //                       data into the sensor
+    input  wire        SEN_SDO       //                       data out of the sensor
 );
 
     localparam integer CLK_HZ = 12_000_000 * PLL_MUL / PLL_DIV;
@@ -112,19 +117,21 @@ module max1000_forth #(
     );
 
     // ------------------------------------------------------------------
-    // 8K x 16 RAM as two 8K x 8 halves (byte stores without byte enables).
-    // Port A = instruction fetch, port B = data. Initialized with the kernel.
+    // 12K x 16 RAM (24 KB, 0x0000..0x5FFF) as two 12K x 8 halves (byte stores without
+    // byte enables). Port A = instruction fetch, port B = data. Initialized with the
+    // kernel. Code runs from the first 16 KB only (13-bit word addresses in jumps and
+    // calls); 0x4000..0x5FFF is data. Stores to 0x6000..0x7FFF are ignored.
     // ------------------------------------------------------------------
-    (* ramstyle = "M9K, no_rw_check" *) reg [7:0] ram_lo [0:8191];
-    (* ramstyle = "M9K, no_rw_check" *) reg [7:0] ram_hi [0:8191];
+    (* ramstyle = "M9K, no_rw_check" *) reg [7:0] ram_lo [0:12287];
+    (* ramstyle = "M9K, no_rw_check" *) reg [7:0] ram_hi [0:12287];
     initial begin
         $readmemh(INIT_LO, ram_lo);
         $readmemh(INIT_HI, ram_hi);
     end
 
     reg  [7:0]  lo_a, hi_a, lo_b, hi_b;
-    wire        ram_store = mem_we && !mem_addr[15];
-    wire [12:0] addrb     = mem_addr[13:1];
+    wire        ram_store = mem_we && !mem_addr[15] && mem_addr[14:13] != 2'b11;
+    wire [13:0] addrb     = mem_addr[14:1];
     wire [7:0]  din_lo    = mem_wdata[7:0];
     wire [7:0]  din_hi    = mem_byte ? mem_wdata[7:0] : mem_wdata[15:8];
     wire        we_lo     = ram_store && (!mem_byte || !mem_addr[0]);
@@ -146,11 +153,11 @@ module max1000_forth #(
     assign insn = {hi_a, lo_a};
 
     // ------------------------------------------------------------------
-    // UART FIFOs: 16 KB in (a whole store payload fits while the flash erases), 1 KB out
+    // UART FIFOs: 8 KB in (store payloads arrive while the flash erases), 1 KB out
     // ------------------------------------------------------------------
     wire [7:0]  rx_dout, tx_dout;
     wire        rx_empty, rx_full, tx_empty, tx_full;
-    wire [14:0] rx_count;
+    wire [13:0] rx_count;
     wire        io_store = mem_we && mem_addr[15];
     assign      sw_restart = io_store && mem_addr[7:1] == 7'd4;
     wire       rx_pop   = mem_rd && cpu_t == 16'h8000;
@@ -158,7 +165,7 @@ module max1000_forth #(
     wire       utx_busy;
     reg        utx_start = 1'b0;
 
-    fifo_bram #(.WIDTH(8), .DEPTH_LOG2(14)) rx_fifo (
+    fifo_bram #(.WIDTH(8), .DEPTH_LOG2(13)) rx_fifo (
         .clk(clk), .rst(cpu_rst), .push(urx_valid && urx_data != 8'h12), .din(urx_data),
         .pop(rx_pop), .dout(rx_dout), .empty(rx_empty), .full(rx_full), .count(rx_count)
     );
@@ -212,6 +219,12 @@ module max1000_forth #(
     reg  [31:0] pin_meta = 32'd0, pin_sync = 32'd0;
     wire [31:0] pin_exists = PIN_EXISTS;
 
+    // The address of the I/O read in progress: registered, so the read multiplexer below
+    // works in the cycle after the address was formed (like the RAM's address register)
+    reg [15:0] io_addr = 16'd0;
+    always @(posedge clk)
+        io_addr <= mem_addr;
+
     // PWM: four channels at 0x8080 + 8c; an enabled channel takes over its pin
     localparam integer PWM_CH = 4;
     wire [15:0]         pwm_rdata;
@@ -221,7 +234,8 @@ module max1000_forth #(
 
     pwm #(.CHANNELS(PWM_CH)) pwm_unit (
         .clk(clk), .rst(cpu_rst), .we(io_store && io_pwm),
-        .ch_sel(mem_addr[4:3]), .reg_sel(mem_addr[2:1]), .wdata(mem_wdata),
+        .ch_sel(mem_addr[4:3]), .reg_sel(mem_addr[2:1]),
+        .rd_ch(io_addr[4:3]), .rd_reg(io_addr[2:1]), .wdata(mem_wdata),
         .rdata(pwm_rdata), .enable(pwm_en), .pin(pwm_pin), .out(pwm_level)
     );
 
@@ -257,43 +271,52 @@ module max1000_forth #(
     end
 
     // ------------------------------------------------------------------
-    // ADC: CH0..CH8 scanned continuously (rtl/adc_scan.v)
+    // ADC: CH0..CH8 and the temperature sensing diode (slot 9) scanned continuously
+    // (rtl/adc_scan.v)
     // ------------------------------------------------------------------
-    wire [12*9-1:0] adc_codes;
+    wire [12*10-1:0] adc_codes;
     adc_scan u_adc (
         .clk(clk), .rst_n(!sys_rst), .pll_c0(pll_clk[0]), .pll_locked(pll_locked),
         .codes(adc_codes)
     );
-    wire [12*16-1:0] adc_pad  = {{12*7{1'b0}}, adc_codes};
-    wire [3:0]       adc_ch   = mem_addr[4:1];
+    wire [12*16-1:0] adc_pad  = {{12*6{1'b0}}, adc_codes};
+    wire [3:0]       adc_ch   = io_addr[4:1];
     wire [11:0]      adc_code = adc_pad[adc_ch*12 +: 12];
 
     // ------------------------------------------------------------------
-    // Serial flash SPI master and CRC-32 at 0x8020..0x802A (rtl/spi_flash.v)
+    // SPI master for the serial flash and the LIS3DH accelerometer, CRC-32 unit,
+    // at 0x8020..0x802A (rtl/spi_flash.v). Both devices share the shift engine; each
+    // has its own pins and select.
     // ------------------------------------------------------------------
     wire        io_spi = mem_addr[7:4] == 4'h2;
     wire [15:0] spi_rdata;
 
     spi_flash u_spi (
         .clk(clk), .rst(cpu_rst), .we(io_store && io_spi), .reg_sel(mem_addr[3:1]),
-        .wdata(mem_wdata), .rdata(spi_rdata),
-        .cs_n(F_S), .sck(F_CLK), .mosi(F_DI), .miso(F_DO)
+        .rd_sel(io_addr[3:1]), .wdata(mem_wdata), .rdata(spi_rdata),
+        .cs_n(F_S), .sck(F_CLK), .mosi(F_DI), .miso(F_DO),
+        .cs2_n(SEN_CS), .sck2(SEN_SPC), .mosi2(SEN_SDI), .miso2(SEN_SDO)
     );
 
     // ------------------------------------------------------------------
-    // I/O registers (CPU side). Reads are registered like the RAM.
+    // I/O registers (CPU side). A read returns its value in the cycle after the address,
+    // like the RAM: io_addr holds the address, the multiplexer below is combinational.
     //   0x8000..0x800E  UART, LEDs, button, restart (write), ms timer, RX peek, RX count
     //   0x8010 + 8p     port p (0..1): +0 pin levels, +2 output latch, +4 direction
-    //   0x8020..0x802A  serial flash SPI and CRC-32
-    //   0x8040 + 2c     ADC channel c (0..8), 12-bit code
+    //   0x8020..0x802A  SPI (flash, accelerometer) and CRC-32
+    //   0x8040 + 2c     ADC channel c (0..8), 12-bit code; 0x8052 temperature diode
     //   0x8080 + 8c     PWM channel c: +0/+2 period, +4 duty, +6 control (rtl/pwm.v)
     // ------------------------------------------------------------------
-    reg [15:0] io_rdata = 16'd0;
+    reg [15:0] io_rdata;
     reg        io_sel   = 1'b0;
 
+    // stores: decoded from mem_addr (= T during a store)
     wire       io_gpio = mem_addr[7:6] == 2'b00 && (mem_addr[5:3] == 3'd2 || mem_addr[5:3] == 3'd3);
     wire       io_port = mem_addr[3];
     wire [4:0] io_bit0 = {io_port, 4'd0};
+    // reads: decoded from io_addr
+    wire       rd_gpio = io_addr[7:6] == 2'b00 && (io_addr[5:3] == 3'd2 || io_addr[5:3] == 3'd3);
+    wire [4:0] rd_bit0 = {io_addr[3], 4'd0};
 
     always @(posedge clk) begin
         if (cpu_rst) begin
@@ -312,32 +335,35 @@ module max1000_forth #(
         end
 
         io_sel <= mem_addr[15];
-        if (mem_addr[7:6] == 2'b01)
-            io_rdata <= (mem_addr[5:1] <= 5'd8) ? {4'd0, adc_code} : 16'd0;
-        else if (io_pwm)
-            io_rdata <= pwm_rdata;
-        else if (io_spi)
-            io_rdata <= spi_rdata;
-        else if (io_gpio)
-            case (mem_addr[2:1])
-                2'd0:    io_rdata <= pin_sync[io_bit0 +: 16] & pin_exists[io_bit0 +: 16];
-                2'd1:    io_rdata <= pin_out[io_bit0 +: 16]  & pin_exists[io_bit0 +: 16];
-                2'd2:    io_rdata <= pin_dir[io_bit0 +: 16]  & pin_exists[io_bit0 +: 16];
-                default: io_rdata <= 16'd0;
+    end
+
+    always @* begin
+        if (io_addr[7:6] == 2'b01)
+            io_rdata = (io_addr[5:1] <= 5'd9) ? {4'd0, adc_code} : 16'd0;
+        else if (io_addr[7:5] == 3'b100)
+            io_rdata = pwm_rdata;
+        else if (io_addr[7:4] == 4'h2)
+            io_rdata = spi_rdata;
+        else if (rd_gpio)
+            case (io_addr[2:1])
+                2'd0:    io_rdata = pin_sync[rd_bit0 +: 16] & pin_exists[rd_bit0 +: 16];
+                2'd1:    io_rdata = pin_out[rd_bit0 +: 16]  & pin_exists[rd_bit0 +: 16];
+                2'd2:    io_rdata = pin_dir[rd_bit0 +: 16]  & pin_exists[rd_bit0 +: 16];
+                default: io_rdata = 16'd0;
             endcase
-        else if (mem_addr[7:4] == 4'd0)
-            case (mem_addr[3:1])
-                3'd0:    io_rdata <= {8'd0, rx_dout};
-                3'd1:    io_rdata <= {13'd0, tx_empty && !utx_busy && !utx_start, !tx_full, !rx_empty};
-                3'd2:    io_rdata <= {8'd0, LED};
-                3'd3:    io_rdata <= {15'd0, btn_state};
-                3'd5:    io_rdata <= ms_count;
-                3'd6:    io_rdata <= {8'd0, rx_dout};        // peek: next byte, not popped
-                3'd7:    io_rdata <= {1'b0, rx_count};       // bytes waiting in the RX FIFO
-                default: io_rdata <= 16'd0;
+        else if (io_addr[7:4] == 4'd0)
+            case (io_addr[3:1])
+                3'd0:    io_rdata = {8'd0, rx_dout};
+                3'd1:    io_rdata = {13'd0, tx_empty && !utx_busy && !utx_start, !tx_full, !rx_empty};
+                3'd2:    io_rdata = {8'd0, LED};
+                3'd3:    io_rdata = {15'd0, btn_state};
+                3'd5:    io_rdata = ms_count;
+                3'd6:    io_rdata = {8'd0, rx_dout};         // peek: next byte, not popped
+                3'd7:    io_rdata = {2'b0, rx_count};        // bytes waiting in the RX FIFO
+                default: io_rdata = 16'd0;
             endcase
         else
-            io_rdata <= 16'd0;
+            io_rdata = 16'd0;
     end
 
     assign mem_rdata = io_sel ? io_rdata : {hi_b, lo_b};
