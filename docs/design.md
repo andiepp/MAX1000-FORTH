@@ -9,7 +9,7 @@ document covers what is different on the MAX1000.
 | Part | Implementation |
 |---|---|
 | Clock | 12 MHz oscillator → PLL: c1 = 40 MHz CPU clock (12 × 10 / 3), c0 = 10 MHz for the ADC |
-| Reset | held until the PLL locks, plus 255 clocks; **Ctrl-R** (0x12) from the host resets the CPU, FIFOs and I/O (the byte is not passed on) |
+| Reset | held until the PLL locks, plus 255 clocks; **Ctrl-R** (0x12) from the host resets the CPU, FIFOs and I/O (the byte is not passed on). The RAM keeps its contents; `cold` restores `dp`/`latest` from `dp0`/`latest0` (set by the cross-compiler), so the dictionary is the kernel's again |
 | RAM | 8K × 16 as two 8K × 8 halves in M9K blocks (byte stores without byte enables); port A fetches instructions, port B is the data port. Both halves are initialized from `build/forth_lo.hex` / `forth_hi.hex` |
 | UART | 115200 8N1 on FTDI channel B (FPGA TX = B4, RX = A4), 1 KB RX and TX FIFOs in M9K |
 | Stacks | Quartus maps the 32-entry data and return stacks into M9K blocks (the read address is a register) |
@@ -33,9 +33,15 @@ Address bit 15 selects I/O; only bits 7..1 are decoded.
 | 0x8004 | user LEDs (8 bits, bit 0 = LED1) | same |
 | 0x8006 | bit 0 = user button pressed (sampled every 10 ms) | – |
 | 0x800A | millisecond counter (wraps) | – |
+| 0x800C | next received byte without taking it (peek) | – |
 | 0x8010 + 8p | port p (0..1) pin levels, synchronized | – |
 | 0x8012 + 8p | port p output latch | same |
 | 0x8014 + 8p | port p direction, 1 = output (0 after reset) | same |
+| 0x8020 | SPI: byte received last | SPI: send a byte (starts an exchange) |
+| 0x8022 | bit 0 = flash selected, bit 1 = SPI busy | bit 0 = select the flash (F_S low) |
+| 0x8024 | – | reset the CRC |
+| 0x8026 | – | add the low byte to the CRC |
+| 0x8028, 0x802A | CRC-32 bits 15..0, 31..16 | – |
 | 0x8040 + 2c | ADC channel c (0..8), 12-bit code | – |
 | 0x8080 + 8c | PWM channel c (0..3), as in ZYNQ-FORTH (period counts 40 MHz clocks) | same |
 
@@ -66,6 +72,41 @@ conversion after another channel.
 The channel numbers come from the Quartus pin report; AIN3 = CH1 was confirmed with the
 bench potentiometer. AIN7 = B1 is the remaining ADC pin and has not been checked with a
 signal yet.
+
+## Serial flash and saved source
+
+The MAX1000 carries a Winbond W25Q64 (8 MB, JEDEC ID EF 40 17) on F_S = B3, F_CLK = A3,
+F_DI = A2, F_DO = B2. The FPGA does not configure from it (the MAX 10 has its own flash), so
+all of it is available. `rtl/spi_flash.v` is a byte-wide SPI master: mode 0, SCK = 10 MHz
+(CPU clock / 4). Forth drives the chip select and the commands (03 read, 02 page program,
+06 write enable, 05 status, 20 4 KB erase, D8 64 KB erase, 9F ID). The same block has a
+CRC-32 unit (standard reflected CRC-32, as zlib computes it) that Forth feeds byte by byte.
+
+Saved source, in the ZYNQ-FORTH format:
+
+| Flash address | Content |
+|---|---|
+| 0x000000 (4 KB sector) | header, 16 bytes, little-endian: magic `HF16`, length (32 bits), CRC-32 of the text, flags (bit 0 = autostart) |
+| 0x010000 (64 KB block) | the text, at most 65,535 bytes, lines end in CR |
+
+`store ( len flags -- )` first erases the header (so an interrupted store leaves no valid
+source), then the text block, prints `ready`, and reads `len` raw bytes from the UART into a
+256-byte buffer, programming one page at a time. The 1 KB RX FIFO covers programming time
+easily: a page arrives in 22 ms and takes about 1 ms to program. At the end it writes the
+header and checks the whole text against its CRC (`source?`). A 49 KB file takes 4.9 s, which
+is mostly UART time.
+
+**Boot.** `cold` resets the dictionary and prints the banner. Then `autoload` checks the
+header and the CRC; if autostart is on, it waits up to 200 ms for an ESC, also looks at the
+user button, and either skips or calls `load-source`. `load-source` starts a flash read and
+sets `fsrc` to the length. From then on `key` takes its bytes from the flash, and
+`accept-line` and `quit` print neither echo nor `ok`. When the last byte is read, the flash
+is deselected; if that byte was not a CR, `key` supplies one. `abort` stops a running load
+and says `(in the saved source)`. The flash stays selected while the source is read, so the
+saved source must not use the flash words itself, except on its last line.
+
+Tests: `sim/run_flash_tests.ps1` runs 21 checks in the instruction-set simulator, which
+models the W25Q64 commands and the CRC unit (`tools/hf16.py run --flash image --button`).
 
 ## Board facts
 

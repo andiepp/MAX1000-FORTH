@@ -14,6 +14,7 @@ The machine model and encodings are described in docs/design.md.
 """
 
 import argparse
+import binascii
 import os
 import re
 import sys
@@ -389,7 +390,8 @@ class Compiler:
 
         # Initial values of the dictionary pointers
         self.align()
-        for var, value in (('dp', self.dp), ('latest', self.latest)):
+        for var, value in (('dp', self.dp), ('latest', self.latest),
+                           ('dp0', self.dp), ('latest0', self.latest)):
             w = self.lookup(var)
             if not w:
                 raise CompileError(f'kernel must define variable {var}')
@@ -409,6 +411,11 @@ PIN_IDLE = 0x0000_0040
 # Simulated ADC codes by ADC channel (12 bits, 3.3 V full scale): CH1 = AIN3 = the
 # bench potentiometer at 1.65 V, CH8 = AIN0 at 3.3 V, the rest 0 V.
 ADC_SIM = {1: 2048, 8: 4095}
+
+# Serial flash model (W25Q64): JEDEC ID, status, write enable, read, page program,
+# 4 KB / 64 KB erase. FLASH_SAVE bytes are kept in the --flash image file.
+FLASH_BYTES = 0x800000
+FLASH_SAVE = 0x20000
 
 
 class Machine:
@@ -432,6 +439,12 @@ class Machine:
         self.adc = [0] * 32
         for ch, value in ADC_SIM.items():
             self.adc[ch] = value
+        self.flash = bytearray(b'\xff' * FLASH_BYTES)
+        self.spi_cs = False
+        self.spi_rx = 0
+        self.wel = False
+        self.fl = {'n': 0, 'cmd': 0, 'addr': 0}
+        self.crc = 0
         # PWM channel c: [period low as written, period (32 bits), duty, control]
         self.pwm = [[0, 0, 0, 0] for _ in range(4)]
 
@@ -455,6 +468,48 @@ class Machine:
         drive = self.pin_dir | owns
         return ((out & drive) | (PIN_IDLE & ~drive)) & PIN_EXISTS
 
+    def spi_select(self, on):
+        if on and not self.spi_cs:
+            self.fl = {'n': 0, 'cmd': 0, 'addr': 0}
+        elif not on and self.spi_cs:
+            cmd, n, a = self.fl['cmd'], self.fl['n'], self.fl['addr'] & 0x7FFFFF
+            if cmd in (0x20, 0xD8) and n >= 4 and self.wel:
+                size = 0x1000 if cmd == 0x20 else 0x10000
+                a &= ~(size - 1)
+                self.flash[a:a + size] = b'\xff' * size
+            if cmd in (0x02, 0x20, 0xD8) and n >= 4:
+                self.wel = False
+        self.spi_cs = on
+
+    def spi_xfer(self, b):
+        if not self.spi_cs:
+            return 0xFF
+        st = self.fl
+        n = st['n']
+        st['n'] += 1
+        if n == 0:
+            st['cmd'] = b
+            if b == 0x06:
+                self.wel = True
+            return 0xFF
+        cmd = st['cmd']
+        if cmd == 0x9F:
+            return (0xEF, 0x40, 0x17)[min(n - 1, 2)]
+        if cmd == 0x05:
+            return 0x02 if self.wel else 0x00
+        if cmd in (0x03, 0x02, 0x20, 0xD8):
+            if n <= 3:
+                st['addr'] = (st['addr'] << 8) | b
+                return 0xFF
+            a = st['addr'] & 0x7FFFFF
+            k = n - 4
+            if cmd == 0x03:
+                return self.flash[(a + k) & 0x7FFFFF]
+            if cmd == 0x02 and self.wel:
+                a = (a & 0x7FFF00) | ((a + k) & 0xFF)     # wraps within the page
+                self.flash[a] &= b
+        return 0xFF
+
     def rd16(self, a):
         if a & 0x8000:
             return self.io_read(a)
@@ -472,10 +527,14 @@ class Machine:
             shift, sel = 16 * port, (a >> 1) & 3
             vec = [self.pins(), self.pin_out, self.pin_dir, 0][sel]
             return ((vec & PIN_EXISTS) >> shift) & 0xFFFF
+        if a & 0xF0 == 0x20:
+            reg = (a >> 1) & 7
+            return {0: self.spi_rx, 1: int(self.spi_cs), 4: self.crc & 0xFFFF,
+                    5: self.crc >> 16}.get(reg, 0)
         if a & 0xF0:
             return 0
         reg = (a >> 1) & 7
-        if reg == 0:
+        if reg == 0 or reg == 6:
             return self.rx[0] if self.rx else 0
         if reg == 1:
             if not self.rx:
@@ -507,6 +566,17 @@ class Machine:
                     self.pin_out = (self.pin_out & ~mask) | ((v & 0xFFFF) << shift)
                 elif sel == 2:
                     self.pin_dir = (self.pin_dir & ~mask) | ((v & 0xFFFF) << shift)
+                return
+            if a & 0xF0 == 0x20:
+                reg = (a >> 1) & 7
+                if reg == 0:
+                    self.spi_rx = self.spi_xfer(v & 0xFF)
+                elif reg == 1:
+                    self.spi_select(bool(v & 1))
+                elif reg == 2:
+                    self.crc = 0
+                elif reg == 3:
+                    self.crc = binascii.crc32(bytes([v & 0xFF]), self.crc)
                 return
             if a & 0xF0:
                 return
@@ -659,6 +729,8 @@ def main():
                    help='a line of terminal input (repeatable)')
     r.add_argument('-f', '--input-file', help='file with lines of terminal input')
     r.add_argument('--steps', type=int, default=20_000_000)
+    r.add_argument('--flash', help='flash image file (loaded if present, saved after the run)')
+    r.add_argument('--button', action='store_true', help='hold the user button')
     args = ap.parse_args()
 
     comp = Compiler()
@@ -680,7 +752,16 @@ def main():
                 lines += f.read().splitlines()
         rx = ''.join(line + '\r' for line in lines).encode('ascii')
         m = Machine(comp.mem, rx)
+        if args.button:
+            m.buttons = 1
+        if args.flash and os.path.exists(args.flash):
+            with open(args.flash, 'rb') as f:
+                data = f.read()
+            m.flash[:len(data)] = data
         m.run(args.steps)
+        if args.flash:
+            with open(args.flash, 'wb') as f:
+                f.write(m.flash[:FLASH_SAVE])
         sys.stdout.write(m.tx.decode('ascii', 'replace'))
         print(f'\n[{m.steps} instructions, dsp={m.dsp}, rsp={m.rsp}, leds={m.leds:08b}]')
 

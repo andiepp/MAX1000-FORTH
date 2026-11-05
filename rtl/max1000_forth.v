@@ -20,7 +20,11 @@ module max1000_forth #(
     output wire        UART_TXD,     // B4 -> FTDI BDBUS1
     input  wire        UART_RXD,     // A4 <- FTDI BDBUS0
     inout  wire [14:0] D,            // Arduino header D0..D14
-    inout  wire [7:0]  PIO           // Pmod PIO_01..PIO_08
+    inout  wire [7:0]  PIO,          // Pmod PIO_01..PIO_08
+    output wire        F_S,          // serial flash: chip select (low active)
+    output wire        F_CLK,        //               clock
+    output wire        F_DI,         //               data into the flash
+    input  wire        F_DO          //               data out of the flash
 );
 
     localparam integer CLK_HZ = 12_000_000 * PLL_MUL / PLL_DIV;
@@ -261,9 +265,22 @@ module max1000_forth #(
     wire [11:0]      adc_code = adc_pad[adc_ch*12 +: 12];
 
     // ------------------------------------------------------------------
+    // Serial flash SPI master and CRC-32 at 0x8020..0x802A (rtl/spi_flash.v)
+    // ------------------------------------------------------------------
+    wire        io_spi = mem_addr[7:4] == 4'h2;
+    wire [15:0] spi_rdata;
+
+    spi_flash u_spi (
+        .clk(clk), .rst(cpu_rst), .we(io_store && io_spi), .reg_sel(mem_addr[3:1]),
+        .wdata(mem_wdata), .rdata(spi_rdata),
+        .cs_n(F_S), .sck(F_CLK), .mosi(F_DI), .miso(F_DO)
+    );
+
+    // ------------------------------------------------------------------
     // I/O registers (CPU side). Reads are registered like the RAM.
     //   0x8000..0x800A  UART, LEDs, button, -, ms timer
     //   0x8010 + 8p     port p (0..1): +0 pin levels, +2 output latch, +4 direction
+    //   0x8020..0x802A  serial flash SPI and CRC-32
     //   0x8040 + 2c     ADC channel c (0..8), 12-bit code
     //   0x8080 + 8c     PWM channel c: +0/+2 period, +4 duty, +6 control (rtl/pwm.v)
     // ------------------------------------------------------------------
@@ -295,6 +312,8 @@ module max1000_forth #(
             io_rdata <= (mem_addr[5:1] <= 5'd8) ? {4'd0, adc_code} : 16'd0;
         else if (io_pwm)
             io_rdata <= pwm_rdata;
+        else if (io_spi)
+            io_rdata <= spi_rdata;
         else if (io_gpio)
             case (mem_addr[2:1])
                 2'd0:    io_rdata <= pin_sync[io_bit0 +: 16] & pin_exists[io_bit0 +: 16];
@@ -309,6 +328,7 @@ module max1000_forth #(
                 3'd2:    io_rdata <= {8'd0, LED};
                 3'd3:    io_rdata <= {15'd0, btn_state};
                 3'd5:    io_rdata <= ms_count;
+                3'd6:    io_rdata <= {8'd0, rx_dout};        // peek: next byte, not popped
                 default: io_rdata <= 16'd0;
             endcase
         else

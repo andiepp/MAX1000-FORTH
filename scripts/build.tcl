@@ -30,7 +30,7 @@ set_global_assignment -name RESERVE_ALL_UNUSED_PINS_WEAK_PULLUP "AS INPUT TRI-ST
 # RAM contents (the kernel) must be part of the flash image
 set_global_assignment -name INTERNAL_FLASH_UPDATE_MODE "SINGLE IMAGE WITH ERAM"
 
-foreach f {max1000_forth.v hf16_cpu.v fifo_bram.v uart.v pwm.v adc_scan.v} {
+foreach f {max1000_forth.v hf16_cpu.v fifo_bram.v uart.v pwm.v adc_scan.v spi_flash.v} {
     set_global_assignment -name VERILOG_FILE [file join $root rtl $f]
 }
 
@@ -55,6 +55,7 @@ set pins {
     D[10]    K12  D[11]    J10  D[12]    H10  D[13]    H13  D[14] G12
     PIO[0]   M3   PIO[1]   L3   PIO[2]   M2   PIO[3]   M1
     PIO[4]   N3   PIO[5]   N2   PIO[6]   K2   PIO[7]   K1
+    F_S      B3   F_CLK    A3   F_DI     A2   F_DO     B2
 }
 foreach {sig pin} $pins {
     set_location_assignment PIN_$pin -to $sig

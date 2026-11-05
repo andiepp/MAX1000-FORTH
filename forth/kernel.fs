@@ -48,6 +48,7 @@
 : abs ( n -- u ) dup 0< if negate then ;
 : min ( a b -- min ) 2dup > if swap then drop ;
 : max ( a b -- max ) 2dup < if swap then drop ;
+: umin ( u1 u2 -- u ) 2dup u> if swap then drop ;
 : +! ( n addr -- ) dup >r @ + r> ! ;
 : cell+ ( a -- a+2 ) 2 + ;
 : cells ( n -- n*2 ) 2* ;
@@ -106,6 +107,8 @@
 
 variable dp          \ next free byte (set by the cross-compiler)
 variable latest      \ newest header (set by the cross-compiler)
+variable dp0         \ their values for a fresh kernel (set by the cross-compiler,
+variable latest0     \ restored by COLD)
 variable state
 variable base
 variable >in
@@ -127,7 +130,11 @@ create tib 82 allot
 \ ---------------------------------------------------------------------------
 
 : key? ( -- f ) $8002 @ 1 and 0<> ;
-: key ( -- c ) begin key? until $8000 @ ;
+\ KEY reads the terminal, or the saved source while LOAD-SOURCE feeds it
+: key ( -- c )
+  fcr @ if 0 fcr ! 13 exit then
+  fsrc @ if fkey exit then
+  begin key? until $8000 @ ;
 : emit ( c -- ) begin $8002 @ 2 and until $8000 ! ;
 : led! ( n -- ) $8004 ! ;              \ 8 user LEDs, bit 0 = LED1
 : led@ ( -- n ) $8004 @ ;
@@ -184,6 +191,94 @@ create ain 8 c, 2 c, 5 c, 1 c, 3 c, 4 c, 7 c, 6 c, 0 c,
 : adc@ ( n -- u )
   dup 9 u< 0= if ."  bad input" cr abort then ain + c@ adc-ch@ ;
 : mv@ ( n -- mv ) adc@ 3300 4096 */ ;
+
+\ ---------------------------------------------------------------------------
+\ Serial flash (Winbond W25Q64, 8 MB) through the SPI master at $8020 and the
+\ CRC-32 unit at $8024 (rtl/spi_flash.v). Flash addresses have 24 bits and are
+\ given as ( lo hi ): lo = bits 15..0, hi = bits 23..16.
+\ ---------------------------------------------------------------------------
+
+: spi ( c -- c' ) $8020 ! begin $8022 @ 2 and 0= until $8020 @ ;
+: spi-cs ( f -- ) 1 and $8022 ! ;
+: f-cmd ( c -- ) 1 spi-cs spi drop ;
+: f-end ( -- ) 0 spi-cs ;
+: f-adr ( lo hi -- ) spi drop dup 8 rshift spi drop spi drop ;
+: f-wait ( -- ) begin 5 f-cmd 0 spi f-end 1 and 0= until ;
+: f-wren ( -- ) 6 f-cmd f-end ;
+: f-read ( lo hi -- ) 3 f-cmd f-adr ;          \ then 0 SPI per byte, F-END
+: f-erase ( lo hi -- ) f-wren $20 f-cmd f-adr f-end f-wait ;     \ 4 KB sector
+: f-erase64 ( lo hi -- ) f-wren $D8 f-cmd f-adr f-end f-wait ;   \ 64 KB block
+\ program n bytes from a; they must stay within one 256-byte page
+: f-prog ( a n lo hi -- )
+  f-wren 2 f-cmd f-adr
+  begin dup while over c@ spi drop 1 /string repeat 2drop f-end f-wait ;
+: flash-id ( -- mfr type size ) $9F f-cmd 0 spi 0 spi 0 spi f-end ;
+: crc-reset ( -- ) 0 $8024 ! ;
+: crc+ ( c -- ) $8026 ! ;
+: crc@ ( -- lo hi ) $8028 @ $802A @ ;
+
+\ ---------------------------------------------------------------------------
+\ Saved source. The text (at most 65535 bytes, lines end in CR) is in the 64 KB
+\ block at $010000, a 16-byte header in the 4 KB sector at 0: magic "HF16",
+\ length (32 bits), CRC-32 of the text, flags (bit 0 = autostart), all
+\ little-endian. STORE takes the text from the serial port (tools/mforth.py
+\ --store). At power-up and after Ctrl-R, COLD runs it if autostart is on,
+\ unless the user button is held or an ESC arrives within 200 ms.
+\ ---------------------------------------------------------------------------
+
+create hdr 16 allot
+create pbuf 256 allot
+variable fsrc        \ bytes of saved source still to be read by KEY
+variable fcr         \ KEY owes a CR (the source did not end in one)
+variable slen
+variable soff
+
+: hdr@ ( -- ) 0 0 f-read 16 0 do 0 spi hdr i + c! loop f-end ;
+: hdr-ok? ( -- f ) hdr @ $4648 = hdr 2 + @ $3631 = and hdr 6 + @ 0= and ;
+: text-crc ( len -- lo hi )
+  crc-reset 0 1 f-read begin dup while 0 spi crc+ 1- repeat drop f-end crc@ ;
+\ length of the saved source if header and CRC are right, else 0
+: source? ( -- len | 0 )
+  hdr@ hdr-ok? 0= if 0 exit then
+  hdr 4 + @ dup text-crc hdr 10 + @ = swap hdr 8 + @ = and 0= if drop 0 then ;
+: fkey ( -- c ) -1 fsrc +! 0 spi fsrc @ 0= if f-end dup 13 <> fcr ! then ;
+: echo? ( -- f ) fsrc @ fcr @ or 0= ;
+: load-source ( -- ) source? ?dup if fsrc ! 0 1 f-read then ;
+: write-hdr ( -- ) 0 0 f-erase hdr 16 0 0 f-prog ;
+\ STORE prints "ready" once the flash is erased, then reads len raw bytes
+: store ( len flags -- )
+  >r slen ! 0 soff !
+  0 0 f-erase 0 1 f-erase64 crc-reset
+  ."  ready" cr
+  begin soff @ slen @ u< while
+    slen @ soff @ - 256 umin dup >r       \ unsigned: lengths go up to 65535
+    0 do key dup crc+ pbuf i + c! loop
+    pbuf r@ soff @ 1 f-prog r> soff +!
+  repeat
+  $4648 hdr ! $3631 hdr 2 + ! slen @ hdr 4 + ! 0 hdr 6 + !
+  crc@ hdr 10 + ! hdr 8 + ! r> hdr 12 + ! 0 hdr 14 + !
+  write-hdr
+  source? slen @ = if ."  stored " slen @ u. ." bytes" else ."  store failed" then cr ;
+: autostart ( f -- )
+  source? 0= if drop ."  no saved source" cr exit then
+  1 and hdr 12 + ! write-hdr ;
+: erase-source ( -- ) 0 0 f-erase ;
+: .source ( -- )
+  source? ?dup if
+    0 1 f-read
+    begin dup while 0 spi dup 13 = if drop cr else emit then 1- repeat
+    drop f-end
+  then ;
+\ an ESC within 200 ms ($800C shows the next received byte without taking it)
+: esc? ( -- f )
+  ms@ 200 + begin
+    key? if $800C @ 27 = if $8000 @ 2drop -1 exit then then
+    dup ms@ - 0<
+  until drop 0 ;
+: autoload ( -- )
+  source? 0= if exit then hdr 12 + @ 1 and 0= if exit then
+  btn@ esc? or if ."  autostart skipped" cr exit then
+  load-source ;
 
 \ ---------------------------------------------------------------------------
 \ Output
@@ -329,7 +424,9 @@ variable sn
 : words ( -- )
   latest @ begin dup while dup name>count type space @ repeat drop cr ;
 
-: abort ( -- ) begin depth while drop repeat quit ;
+: abort ( -- )
+  fsrc @ fcr @ or if 0 fsrc ! 0 fcr ! f-end ."  (in the saved source)" cr then
+  begin depth while drop repeat quit ;
 
 \ The data stack has 32 entries and wraps silently. Looking up a word needs up
 \ to 9 more (find-name -> same? -> upper), so more than 20 user items count as
@@ -360,11 +457,11 @@ variable sn
   0 #tib ! 0 >in !
   begin key dup 13 = over 10 = or 0= while
     dup 8 = over 127 = or if
-      drop #tib @ if -1 #tib +! 8 emit space 8 emit then
+      drop #tib @ if -1 #tib +! echo? if 8 emit space 8 emit then then
     else
-      #tib @ 80 < if dup emit tib #tib @ + c! 1 #tib +! else drop then
+      #tib @ 80 < if echo? if dup emit then tib #tib @ + c! 1 #tib +! else drop then
     then
-  repeat drop space ;
+  repeat drop echo? if space then ;
 
 \ SNAP copies the data stack into SSNAP (bottom first) before each line, for the
 \ app's stack view. SDEPTH is -1 while the copy is in progress.
@@ -378,10 +475,11 @@ variable sdepth
 
 : quit ( -- )
   0 state !
-  begin snap accept-line interpret state @ 0= if ."  ok" then cr again ;
+  begin snap accept-line interpret echo? if state @ 0= if ."  ok" then cr then again ;
 
 : cold ( -- )
+  dp0 @ dp ! latest0 @ latest ! 0 fsrc ! 0 fcr !
   decimal 0 state !
   cr ." HF16 Forth on MAX1000" cr
   1 led!
-  quit ;
+  autoload quit ;
