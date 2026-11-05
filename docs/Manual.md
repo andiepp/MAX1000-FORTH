@@ -296,7 +296,9 @@ board as Forth sees it, read several times a second:
   number). Open inputs have no pull-ups and may show either level (section 5.11);
 - which PWM channels are on, and their pins (*PWM0 → D3*);
 - the **analog inputs** AIN0..AIN7 and AIN as bars with their voltage, 0 to 3.3 V
-  (section 5.12).
+  (section 5.12);
+- the chip **temperature** and the **tilt** from the accelerometer in g (x, y, z), with an
+  app newer than 2.4 (sections 5.12 and 5.14).
 
 The view only reads: Forth's I/O is never changed by it. It is updated only while Forth
 answers (section 2.3).
