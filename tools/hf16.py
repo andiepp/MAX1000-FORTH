@@ -285,6 +285,13 @@ class Compiler:
             for ch in text.encode('ascii'):
                 self.c_comma(ch)
             self.align()
+        elif low == 's"':
+            text = self.parse('"')
+            self.call_word('(s")')
+            self.c_comma(len(text))
+            for ch in text.encode('ascii'):
+                self.c_comma(ch)
+            self.align()
         elif low == '[char]':
             self.emit(literal(ord(self.need('character'))))
         elif low == "[']":
@@ -396,6 +403,13 @@ class Compiler:
             if not w:
                 raise CompileError(f'kernel must define variable {var}')
             self.set_cell(w['xt'] + 4, value)
+
+        # KCHECK: the sum of the image's cells (with KCHECK itself 0), for the version answer
+        w = self.lookup('kcheck')
+        if w:
+            self.set_cell(w['xt'] + 4, 0)
+            total = sum(self.cell(a) for a in range(0, self.dp, 2)) & 0xFFFF
+            self.set_cell(w['xt'] + 4, total)
         return self.dp
 
 
@@ -434,6 +448,8 @@ class Machine:
         self.ms = 0
         self.steps = 0
         self.idle_reads = 0
+        self.restart_pending = False
+        self.starts = 1
         self.pin_out = 0
         self.pin_dir = 0
         self.adc = [0] * 32
@@ -539,13 +555,15 @@ class Machine:
         if reg == 1:
             if not self.rx:
                 self.idle_reads += 1
-            return (1 if self.rx else 0) | 2
+            return (1 if self.rx else 0) | 2 | 4
         if reg == 2:
             return self.leds
         if reg == 3:
             return self.buttons
         if reg == 5:
             return self.ms & 0xFFFF
+        if reg == 7:
+            return min(len(self.rx), 0x7FFF)
         return 0
 
     def store(self, a, v, byte):
@@ -583,8 +601,11 @@ class Machine:
             reg = (a >> 1) & 7
             if reg == 0:
                 self.tx.append(v & 0xFF)
+                self.idle_reads = 0          # printing is not waiting for input
             elif reg == 2:
                 self.leds = v & 0xFF
+            elif reg == 4:
+                self.restart_pending = True
             return
         a &= 0x3FFF
         if byte:
@@ -673,11 +694,22 @@ class Machine:
             self.pc = (r >> 1) & 0x1FFF if insn & 0x1000 else pc1
             self.dsp, self.rsp, self.t = new_dsp, new_rsp, v
 
+    def restart(self):
+        """What a CPU reset does (Ctrl-R or a store to 0x8008); the RAM keeps its contents."""
+        self.pc = self.t = self.dsp = self.rsp = 0
+        self.leds = self.pin_out = self.pin_dir = 0
+        self.pwm = [[0, 0, 0, 0] for _ in range(4)]
+        self.spi_select(False)
+        self.restart_pending = False
+        self.starts += 1
+
     def run(self, max_steps, idle_limit=2000):
         """Run until max_steps, or until all input is consumed and the program
         has polled an empty RX FIFO idle_limit times (waiting at KEY)."""
         while self.steps < max_steps:
             self.step()
+            if self.restart_pending:
+                self.restart()
             if not self.rx and self.idle_reads > idle_limit:
                 break
 

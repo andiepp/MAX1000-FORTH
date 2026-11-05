@@ -86,9 +86,11 @@ module max1000_forth #(
         .clk(clk), .rst(sys_rst), .rxd(UART_RXD), .data(urx_data), .valid(urx_valid)
     );
 
-    reg restart = 1'b0;
+    // also a store to 0x8008 (the kernel's answer to a "restart" request)
+    reg  restart = 1'b0;
+    wire sw_restart;
     always @(posedge clk)
-        restart <= urx_valid && urx_data == 8'h12;
+        restart <= (urx_valid && urx_data == 8'h12) || sw_restart;
 
     wire cpu_rst = sys_rst | restart;
 
@@ -144,24 +146,26 @@ module max1000_forth #(
     assign insn = {hi_a, lo_a};
 
     // ------------------------------------------------------------------
-    // UART FIFOs (1 KB each)
+    // UART FIFOs: 16 KB in (a whole store payload fits while the flash erases), 1 KB out
     // ------------------------------------------------------------------
-    wire [7:0] rx_dout, tx_dout;
-    wire       rx_empty, rx_full, tx_empty, tx_full;
-    wire       io_store = mem_we && mem_addr[15];
+    wire [7:0]  rx_dout, tx_dout;
+    wire        rx_empty, rx_full, tx_empty, tx_full;
+    wire [14:0] rx_count;
+    wire        io_store = mem_we && mem_addr[15];
+    assign      sw_restart = io_store && mem_addr[7:1] == 7'd4;
     wire       rx_pop   = mem_rd && cpu_t == 16'h8000;
     wire       tx_push  = io_store && mem_addr[7:1] == 7'd0;
     wire       utx_busy;
     reg        utx_start = 1'b0;
 
-    fifo_bram #(.WIDTH(8), .DEPTH_LOG2(10)) rx_fifo (
+    fifo_bram #(.WIDTH(8), .DEPTH_LOG2(14)) rx_fifo (
         .clk(clk), .rst(cpu_rst), .push(urx_valid && urx_data != 8'h12), .din(urx_data),
-        .pop(rx_pop), .dout(rx_dout), .empty(rx_empty), .full(rx_full)
+        .pop(rx_pop), .dout(rx_dout), .empty(rx_empty), .full(rx_full), .count(rx_count)
     );
 
     fifo_bram #(.WIDTH(8), .DEPTH_LOG2(10)) tx_fifo (
         .clk(clk), .rst(cpu_rst), .push(tx_push), .din(mem_wdata[7:0]),
-        .pop(utx_start), .dout(tx_dout), .empty(tx_empty), .full(tx_full)
+        .pop(utx_start), .dout(tx_dout), .empty(tx_empty), .full(tx_full), .count()
     );
 
     always @(posedge clk)
@@ -278,7 +282,7 @@ module max1000_forth #(
 
     // ------------------------------------------------------------------
     // I/O registers (CPU side). Reads are registered like the RAM.
-    //   0x8000..0x800A  UART, LEDs, button, -, ms timer
+    //   0x8000..0x800E  UART, LEDs, button, restart (write), ms timer, RX peek, RX count
     //   0x8010 + 8p     port p (0..1): +0 pin levels, +2 output latch, +4 direction
     //   0x8020..0x802A  serial flash SPI and CRC-32
     //   0x8040 + 2c     ADC channel c (0..8), 12-bit code
@@ -324,11 +328,12 @@ module max1000_forth #(
         else if (mem_addr[7:4] == 4'd0)
             case (mem_addr[3:1])
                 3'd0:    io_rdata <= {8'd0, rx_dout};
-                3'd1:    io_rdata <= {14'd0, !tx_full, !rx_empty};
+                3'd1:    io_rdata <= {13'd0, tx_empty && !utx_busy && !utx_start, !tx_full, !rx_empty};
                 3'd2:    io_rdata <= {8'd0, LED};
                 3'd3:    io_rdata <= {15'd0, btn_state};
                 3'd5:    io_rdata <= ms_count;
                 3'd6:    io_rdata <= {8'd0, rx_dout};        // peek: next byte, not popped
+                3'd7:    io_rdata <= {1'b0, rx_count};       // bytes waiting in the RX FIFO
                 default: io_rdata <= 16'd0;
             endcase
         else

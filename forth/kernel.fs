@@ -109,6 +109,13 @@ variable dp          \ next free byte (set by the cross-compiler)
 variable latest      \ newest header (set by the cross-compiler)
 variable dp0         \ their values for a fresh kernel (set by the cross-compiler,
 variable latest0     \ restored by COLD)
+variable kcheck      \ sum of the kernel image's cells (set by the cross-compiler)
+variable starts      \ starts since the configuration was loaded
+variable last-start  \ 0 none, 1 the saved source ran, 2 it was skipped
+variable skip1       \ the next start skips the saved source ("restart skip")
+variable serving     \ a service answer is being sent
+variable counting    \ an answer's payload is being counted, not sent
+variable acount
 variable state
 variable base
 variable >in
@@ -129,18 +136,32 @@ create tib 82 allot
 \ Board I/O
 \ ---------------------------------------------------------------------------
 
-: key? ( -- f ) $8002 @ 1 and 0<> ;
+\ Service requests (SOH ... LF, docs/Protocol.md) arrive in the same FIFO as
+\ terminal input. SERVICE? answers those at the head of the FIFO; KEY, KEY?, MS
+\ and EMIT call it while they wait, so the app gets answers at the prompt and
+\ while a program waits, polls KEY? or prints.
+: rx? ( -- f ) $8002 @ 1 and 0<> ;            \ a byte is waiting (raw)
+: soh? ( -- f ) rx? if $800C @ 1 = else 0 then ;
+\ true when a terminal byte is next; a request at the head of the FIFO is served
+\ first (deciding on the head byte itself leaves no window for a SOH to slip by)
+: key? ( -- f )
+  serving @ if rx? exit then
+  begin service? rx? while $800C @ 1 <> if -1 exit then repeat 0 ;
 \ KEY reads the terminal, or the saved source while LOAD-SOURCE feeds it
 : key ( -- c )
   fcr @ if 0 fcr ! 13 exit then
   fsrc @ if fkey exit then
   begin key? until $8000 @ ;
-: emit ( c -- ) begin $8002 @ 2 and until $8000 ! ;
+: tx ( c -- ) begin $8002 @ 2 and 0= while service? repeat $8000 ! ;
+\ EMIT: terminal output doubles a 0x01; while an answer is counted it only counts
+: emit ( c -- )
+  counting @ if drop 1 acount +! exit then
+  dup 1 = serving @ 0= and if dup tx then tx ;
 : led! ( n -- ) $8004 ! ;              \ 8 user LEDs, bit 0 = LED1
 : led@ ( -- n ) $8004 @ ;
 : btn@ ( -- f ) $8006 @ 1 and 0<> ;    \ user button, true while pressed
 : ms@ ( -- n ) $800A @ ;
-: ms ( n -- ) ms@ + begin dup ms@ - 0< until drop ;
+: ms ( n -- ) ms@ + begin service? dup ms@ - 0< until drop ;
 
 \ ---------------------------------------------------------------------------
 \ Digital pins. Pin numbers: 0..14 = D0..D14 (Arduino header), 16..23 =
@@ -232,37 +253,63 @@ variable fsrc        \ bytes of saved source still to be read by KEY
 variable fcr         \ KEY owes a CR (the source did not end in one)
 variable slen
 variable soff
+variable s-state     \ the saved source as last checked: 0 none, 1 stored, 2 damaged
+variable s-len
+variable s-auto
+variable s-crclo
+variable s-crchi
 
 : hdr@ ( -- ) 0 0 f-read 16 0 do 0 spi hdr i + c! loop f-end ;
 : hdr-ok? ( -- f ) hdr @ $4648 = hdr 2 + @ $3631 = and hdr 6 + @ 0= and ;
 : text-crc ( len -- lo hi )
   crc-reset 0 1 f-read begin dup while 0 spi crc+ 1- repeat drop f-end crc@ ;
+\ read the header and check the text's CRC; sets S-STATE, S-LEN, S-AUTO, S-CRC..
+: scan-source ( -- )
+  0 s-state ! 0 s-len ! 0 s-auto ! 0 s-crclo ! 0 s-crchi !
+  hdr@ hdr-ok? 0= if exit then
+  hdr 4 + @ dup s-len ! hdr 8 + @ s-crclo ! hdr 10 + @ s-crchi !
+  hdr 12 + @ 1 and s-auto !
+  text-crc s-crchi @ = swap s-crclo @ = and if 1 else 2 then s-state ! ;
 \ length of the saved source if header and CRC are right, else 0
-: source? ( -- len | 0 )
-  hdr@ hdr-ok? 0= if 0 exit then
-  hdr 4 + @ dup text-crc hdr 10 + @ = swap hdr 8 + @ = and 0= if drop 0 then ;
+: source? ( -- len | 0 ) scan-source s-state @ 1 = if s-len @ else 0 then ;
 : fkey ( -- c ) -1 fsrc +! 0 spi fsrc @ 0= if f-end dup 13 <> fcr ! then ;
 : echo? ( -- f ) fsrc @ fcr @ or 0= ;
-: load-source ( -- ) source? ?dup if fsrc ! 0 1 f-read then ;
+: (load) ( len -- ) ?dup if fsrc ! 0 1 f-read then ;
+: load-source ( -- ) source? (load) ;
 : write-hdr ( -- ) 0 0 f-erase hdr 16 0 0 f-prog ;
-\ STORE prints "ready" once the flash is erased, then reads len raw bytes
-: store ( len flags -- )
-  >r slen ! 0 soff !
-  0 0 f-erase 0 1 f-erase64 crc-reset
-  ."  ready" cr
-  begin soff @ slen @ u< while
-    slen @ soff @ - 256 umin dup >r       \ unsigned: lengths go up to 65535
-    0 do key dup crc+ pbuf i + c! loop
-    pbuf r@ soff @ 1 f-prog r> soff +!
-  repeat
+: make-hdr ( flags -- )
   $4648 hdr ! $3631 hdr 2 + ! slen @ hdr 4 + ! 0 hdr 6 + !
-  crc@ hdr 10 + ! hdr 8 + ! r> hdr 12 + ! 0 hdr 14 + !
-  write-hdr
+  crc@ hdr 10 + ! hdr 8 + ! hdr 12 + ! 0 hdr 14 + ! ;
+\ a received byte within 2 s, or -1
+variable dl
+: rx-t ( -- c | -1 )
+  ms@ 2000 + dl ! begin rx? if $8000 @ exit then dl @ ms@ - 0< until -1 ;
+\ n bytes from the serial port into PBUF (and the CRC); false on a timeout
+: page-in ( n -- f )
+  0 begin 2dup > while
+    rx-t dup 0< if drop 2drop 0 exit then
+    dup crc+ over pbuf + c! 1+
+  repeat 2drop -1 ;
+\ len raw bytes from the serial port into the text area, erasing 4 KB sectors
+\ as it goes; false on a timeout
+: receive ( len -- f )
+  slen ! 0 soff ! crc-reset
+  begin soff @ slen @ u< while
+    soff @ $FFF and 0= if soff @ 1 f-erase then
+    slen @ soff @ - 256 umin dup >r       \ unsigned: lengths go up to 65535
+    page-in 0= if r> drop 0 exit then
+    pbuf r@ soff @ 1 f-prog r> soff +!
+  repeat -1 ;
+\ STORE prints "ready", then reads len raw bytes (tools/mforth.py --store)
+: store ( len flags -- )
+  >r 0 0 f-erase ."  ready" cr
+  receive 0= if r> drop ."  store timeout" cr scan-source exit then
+  r> make-hdr write-hdr
   source? slen @ = if ."  stored " slen @ u. ." bytes" else ."  store failed" then cr ;
 : autostart ( f -- )
   source? 0= if drop ."  no saved source" cr exit then
-  1 and hdr 12 + ! write-hdr ;
-: erase-source ( -- ) 0 0 f-erase ;
+  1 and hdr 12 + ! write-hdr scan-source ;
+: erase-source ( -- ) 0 0 f-erase scan-source ;
 : .source ( -- )
   source? ?dup if
     0 1 f-read
@@ -276,10 +323,157 @@ variable soff
     dup ms@ - 0<
   until drop 0 ;
 : autoload ( -- )
-  source? 0= if exit then hdr 12 + @ 1 and 0= if exit then
-  esc? btn@ or if ."  autostart skipped" cr exit then   \ btn@ after the wait:
-  \ the button is sampled every 10 ms and reads "not pressed" until the first sample
-  load-source ;
+  0 last-start ! scan-source
+  s-state @ 1 = s-auto @ and 0= if exit then
+  skip1 @ 0 skip1 ! esc? or btn@ or if     \ btn@ after the wait: the button is
+    ."  autostart skipped" cr 2 last-start ! exit   \ sampled every 10 ms
+  then
+  1 last-start ! s-len @ (load) ;
+
+\ ---------------------------------------------------------------------------
+\ Service requests (protocol 1 of ZYNQ-FORTH, docs/Protocol.md): SOH, a line,
+\ LF; answered "SOH ok <name> <length> LF <payload>" or "SOH err <name>
+\ <reason> LF". The payload is generated twice: once to count it, once to send.
+\ ---------------------------------------------------------------------------
+
+create rq 64 allot
+variable rq#         \ request length
+variable rq>         \ parse position
+variable rqn-a       \ request name
+variable rqn-n
+variable ea          \ argument kept for the payload
+variable en
+variable rlen
+variable rclo
+variable rchi
+variable rflag
+variable pp
+
+: noop ( -- ) ;
+: lf ( -- ) 10 emit ;
+: hexd ( u -- ) 15 and digit emit ;
+: hex4 ( u -- ) dup 12 rshift hexd dup 8 rshift hexd dup 4 rshift hexd hexd ;
+: hex8 ( lo hi -- ) hex4 hex4 ;
+: =s ( a n a2 n2 -- f ) rot over = if same? else drop 2drop 0 then ;
+: hexnum ( a n -- u ) base @ >r hex number? drop r> base ! ;
+
+: rq-line ( -- f )   \ the request text up to LF; false on a 2 s timeout
+  0 rq# !
+  begin rx-t dup 0< if drop 0 exit then dup 10 <> while
+    rq# @ 63 < if rq rq# @ + c! 1 rq# +! else drop then
+  repeat drop -1 ;
+: rq-c ( -- c ) rq rq> @ + c@ ;
+: rq-word ( -- a n )
+  begin rq> @ rq# @ < if rq-c 32 = else 0 then while 1 rq> +! repeat
+  rq rq> @ +
+  begin rq> @ rq# @ < if rq-c 32 <> else 0 then while 1 rq> +! repeat
+  rq rq> @ + over - ;
+: rq= ( a n -- f ) rqn-a @ rqn-n @ =s ;
+
+: answer ( xt -- )
+  base @ >r decimal
+  -1 counting ! 0 acount ! dup execute 0 counting !
+  1 tx ." ok " rqn-a @ rqn-n @ type space acount @ (u.) lf
+  execute r> base ! ;
+: answer-n ( xt n -- )   \ the length is known: generate once
+  base @ >r decimal
+  1 tx ." ok " rqn-a @ rqn-n @ type space (u.) lf
+  execute r> base ! ;
+: refuse ( a n -- ) 1 tx ." err " rqn-a @ rqn-n @ type space type lf ;
+
+: p-echo ( -- ) ea @ en @ type ;
+: p-version ( -- )
+  ." firmware max1000-forth 1.0" lf ." protocol 1" lf
+  ." kernel " dp0 @ 2/ (u.) space kcheck @ hex4 lf ;
+: p-status ( -- )
+  ." state running" lf ." pc 0000" lf
+  ." input " $800E @ fsrc @ + (u.) lf
+  ." starts " starts @ (u.) lf
+  ." source " s-state @ dup 0= if ." none" then dup 1 = if ." stored" then
+  2 = if ." damaged" then lf
+  ." length " s-state @ 1 = if s-len @ else 0 then (u.) lf
+  ." crc " s-crclo @ s-crchi @ hex8 lf
+  ." autostart " s-auto @ if ." on" else ." off" then lf
+  ." last " last-start @ dup 0= if ." none" then dup 1 = if ." fed" then
+  2 = if ." skipped" then lf ;
+: p-words ( -- )
+  ." here " here hex4 lf
+  latest @ begin dup while
+    dup name>xt hex4 space
+    dup 2 + c@ dup $E0 and 0= if 45 emit then
+    dup $80 and if 105 emit then dup $40 and if 104 emit then
+    $20 and if 110 emit then space
+    dup name>count type lf
+  @ repeat drop ;
+: p-stack ( -- )
+  sdepth @ dup (u.) 0 begin 2dup > while space dup cells ssnap + @ hex4 1+ repeat
+  2drop lf ;
+: pwm-ctl ( c -- ctl ) 3 lshift $8086 + @ ;
+\ pins of port p that an enabled PWM channel drives
+: pwm-own ( p -- mask )
+  pp ! 0 4 0 do
+    i pwm-ctl dup $8000 and 0= if drop else
+      $3F and dup 4 rshift pp @ = if 15 and 1 swap lshift or else drop then
+    then
+  loop ;
+: port-word ( p -- lo hi ) dup 3 lshift $8010 + dup @ swap 4 + @ rot pwm-own or ;
+: pwm-word ( -- lo hi )
+  0 4 0 do i pwm-ctl $8000 and if 1 i lshift or then loop
+  0 pwm-ctl $3F and 4 lshift or 1 pwm-ctl $3F and 10 lshift or
+  2 pwm-ctl $3F and 3 pwm-ctl $3F and 6 lshift or ;
+: p-board ( -- )
+  ." board " led@ $FF and btn@ 1 and hex8 lf
+  ." ports " 0 port-word hex8 space 1 port-word hex8 lf
+  ." pwm " pwm-word hex8 lf
+  ." adc" 9 0 do space i adc-ch@ hex4 loop lf ;
+: p-source ( -- )
+  s-len @ 0 1 f-read begin dup while 0 spi emit 1- repeat drop f-end ;
+: tx-idle ( -- ) begin $8002 @ 4 and until ;
+
+: rq-restart ( -- )
+  rq-word s" skip" =s skip1 !
+  ['] noop answer tx-idle 0 $8008 ! ;
+: rq-source ( -- )
+  scan-source s-state @ 0= if s" none" refuse exit then
+  s-state @ 2 = if s" damaged" refuse exit then
+  ['] p-source s-len @ answer-n ;
+: on/off ( -- f ok? )
+  rq-word 2dup s" on" =s if 2drop -1 -1 exit then
+  s" off" =s if 0 -1 else 0 0 then ;
+: rq-store ( -- )
+  rq-word dup 1 6 within 0= if 2drop s" args" refuse exit then
+  number? 0= if drop s" args" refuse exit then rlen !
+  rq-word dup 8 <> if 2drop s" args" refuse exit then
+  drop dup 4 hexnum rchi ! 4 + 4 hexnum rclo !
+  on/off 0= if drop s" args" refuse exit then 1 and rflag !
+  0 0 f-erase
+  rlen @ receive 0= if scan-source s" timeout" refuse exit then
+  crc@ rchi @ = swap rclo @ = and 0= if scan-source s" crc" refuse exit then
+  rflag @ make-hdr write-hdr scan-source
+  s-state @ 1 = if ['] noop answer else s" flash" refuse then ;
+: rq-autostart ( -- )
+  on/off 0= if drop s" args" refuse exit then
+  scan-source s-state @ 1 = 0= if drop s" none" refuse exit then
+  1 and hdr 12 + ! write-hdr scan-source ['] noop answer ;
+
+: dispatch ( -- )
+  s" echo" rq= if rq-word en ! ea ! ['] p-echo answer exit then
+  s" version" rq= if ['] p-version answer exit then
+  s" status" rq= if ['] p-status answer exit then
+  s" words" rq= if ['] p-words answer exit then
+  s" stack" rq= if sdepth @ 0< if s" busy" refuse exit then ['] p-stack answer exit then
+  s" board" rq= if ['] p-board answer exit then
+  s" source" rq= if rq-source exit then
+  s" store" rq= if rq-store exit then
+  s" erase" rq= if erase-source ['] noop answer exit then
+  s" autostart" rq= if rq-autostart exit then
+  s" restart" rq= if rq-restart exit then
+  s" unknown" refuse ;
+: serve ( -- )
+  $8000 @ drop -1 serving !
+  rq-line if 0 rq> ! rq-word rqn-n ! rqn-a ! dispatch then
+  0 serving ! ;
+: service? ( -- ) serving @ if exit then begin soh? while serve repeat ;
 
 \ ---------------------------------------------------------------------------
 \ Output
@@ -290,6 +484,7 @@ variable soff
 : spaces ( n -- ) begin dup 0> while space 1- repeat drop ;
 : type ( a n -- ) begin dup while swap dup c@ emit 1+ swap 1- repeat 2drop ;
 : (.") ( -- ) r> dup c@ swap 1+ swap 2dup type + aligned >r ;
+: (s") ( -- a n ) r> dup c@ swap 1+ swap 2dup + aligned >r ;
 : digit ( u -- c ) dup 9 > if 7 + then 48 + ;
 : (u.) ( u -- ) base @ u/mod ?dup if recurse then digit emit ;
 : u. ( u -- ) (u.) space ;
@@ -479,7 +674,8 @@ variable sdepth
   begin snap accept-line interpret echo? if state @ 0= if ."  ok" then cr then again ;
 
 : cold ( -- )
-  dp0 @ dp ! latest0 @ latest ! 0 fsrc ! 0 fcr !
+  dp0 @ dp ! latest0 @ latest ! 0 fsrc ! 0 fcr ! 0 serving ! 0 counting !
+  1 starts +!
   decimal 0 state !
   cr ." HF16 Forth on MAX1000" cr
   1 led!
