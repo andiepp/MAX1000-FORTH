@@ -129,7 +129,7 @@ accelerometer on, prints the banner, lights LED1 and runs `autoload`, then `quit
 | Address | Content |
 |---|---|
 | 0x0000 | reset vector: jump to `cold` |
-| 0x0002.. | kernel: code, headers, variables (about 9.7 KB) |
+| 0x0002.. | kernel: code, headers, variables (about 9.9 KB) |
 | … `here` | user dictionary, grows up to 0x3FFF (`unused` shows what is left) |
 | 0x4000–0x5BFF | data RAM, handed out by `buffer:` (`unused-data`) |
 | 0x5C00 | `pbuf`, 256 bytes: one flash page for `store` |
@@ -138,7 +138,8 @@ accelerometer on, prints the banner, lights LED1 and runs `autoload`, then `quit
 | 0x5DA0 | `sbuf`, 64 bytes: `.s` parks the stack here |
 | 0x5DE0 | `ssnap`, 40 bytes: the data stack at the last prompt (the `stack` request) |
 | 0x5E10 | `hdr`, 16 bytes: the saved source's header |
-| 0x5E20–0x5FFF | free (not handed out) |
+| 0x5E20–0x5EFF | free (not handed out) |
+| 0x5F00 | `lbuf`, 256 bytes: the piece of saved source being interpreted |
 
 Dictionary entries: link (cell, address of the previous header, 0 ends the list), count
 byte (bits 4..0 = name length, bit 7 = IMMEDIATE, bit 6 = HIDDEN, bit 5 = INLINE), the
@@ -264,13 +265,13 @@ app's `store` request use the same path.
 which also caches the state for the `status` request). If autostart is on, it waits up to
 200 ms for an ESC (peeking at 0x800C, so other bytes stay), then reads the user button —
 after the wait, because the button is sampled every 10 ms and reads "not pressed" until the
-first sample — and either skips or starts the load. `load-source` starts a flash read and
-sets `fsrc` to the length. From then on `key` takes its bytes from the flash, and
-`accept-line` and `quit` print neither echo nor `ok`. When the last byte is read the flash is
-deselected; if that byte was not a CR, `key` supplies one. `abort` stops a running load and
-says `(in the saved source)`. While the source is read the flash stays selected, so the
-source must not use the SPI itself (flash or accelerometer) except on its last line;
-service requests wait until the load is over.
+first sample — and either skips or starts the load. `load-source` sets `fsrc` to the length.
+From then on `key` takes its bytes from the saved source, and `accept-line` and `quit` print
+neither echo nor `ok`. `fkey` copies the text into `lbuf` (0x5F00) 256 bytes at a time
+(`lfill`: select the flash, read, deselect), so the flash is selected only while a piece is
+copied and the source itself may use the flash and the accelerometer on any line. If the
+last byte was not a CR, `key` supplies one. `abort` stops a running load and says
+`(in the saved source)`.
 
 ## Service requests (the app)
 
@@ -285,7 +286,10 @@ slip into the input line. `key`, `ms` and the wait in `emit` go through `key?`/`
 so answers come at the prompt and whenever a program waits, polls `key?` or prints. A word
 that only computes answers nothing until it ends; Ctrl-R always works because it is
 hardware. A request queued behind terminal input waits until Forth has read that input (the
-app therefore sends text in 4 KB pieces). `serving` keeps an answer from starting another.
+app therefore sends text in 4 KB pieces). `serving` keeps an answer from starting another,
+and no request is answered while a word has the flash or the accelerometer selected (bit 0
+or 2 of 0x8022): `board` reads the accelerometer and `source` reads the flash, which would
+break a transfer that word has open. Such a word's requests wait until it deselects.
 
 **Answers.** `answer ( xt -- )` runs the payload word twice: once with `counting` set,
 where `emit` only counts bytes, then for real after the header with the length. `source`
@@ -321,8 +325,8 @@ the RX count and the CPU reset.
 
 | Test | Checks |
 |---|---|
-| `sim/run_flash_tests.ps1` | 21: flash ID, store, autostart, skips (button, ESC), listing, errors in the source, a source without final CR, 41 KB sources, erase |
-| `python sim/test_protocol.py` | 37: every request, answers during `ms`, SOH doubling, dropped requests, store/restart cycles, the `board` lines, data RAM limits, `buffer:` |
+| `sim/run_flash_tests.ps1` | 23: flash ID, store, autostart, skips (button, ESC), listing, errors in the source, a source without final CR, flash and accelerometer words inside a saved source, 41 KB sources, erase |
+| `python sim/test_protocol.py` | 39: every request, answers during `ms`, SOH doubling, dropped requests, store/restart cycles, the `board` lines, data RAM limits, `buffer:` alignment, no answer while the flash is selected |
 
 ## Timing and resources
 

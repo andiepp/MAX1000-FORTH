@@ -72,6 +72,13 @@ $o = Run @('7 .')
 Check 'last line without CR runs' $o 'no-final-cr'
 Check 'terminal works after it' $o '7 \. 7'
 
+# a saved source may use the flash and the accelerometer on any line (it is read in pieces)
+$spi = @('hex flash-id . . . decimal', 'accel@ . . .', ': after ." spi-ok" ;', 'after')
+$o = Run (Store-Lines $spi 1) -Fresh
+$o = Run @('7 .')
+Check 'SPI words inside a saved source' $o '17 40 EF[\s\S]*1000 0 0[\s\S]*spi-ok'
+Check 'source after SPI use complete' $o '7 \. 7'
+
 # more than 32767 bytes (lengths are unsigned) and many pages
 $big = @(0..599 | ForEach-Object { ("\ filler line {0:D4} " -f $_) + ('x' * 50) }) + @(': bigw 4711 ;')
 $o = Run (Store-Lines $big 1) -Fresh

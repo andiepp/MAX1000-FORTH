@@ -6,7 +6,7 @@ The first release: the HF16 Forth of [ZYNQ-FORTH](https://github.com/andiepp/ZYN
 alone on a Trenz MAX1000 (Intel MAX 10 10M08).
 
 - **CPU and kernel.** HF16 at 48 MHz, one instruction per clock; the kernel (about 300
-  words, 9.7 KB) is part of the FPGA configuration. RAM 24 KB: 16 KB for code and the
+  words, 9.9 KB) is part of the FPGA configuration. RAM 24 KB: 16 KB for code and the
   dictionary, 8 KB data RAM (`buffer:`).
 - **Terminal.** 115200 8N1 on the board's USB serial port; Ctrl-R restarts Forth in
   hardware, even in an endless loop.

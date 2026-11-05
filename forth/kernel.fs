@@ -279,8 +279,12 @@ create ain 8 c, 2 c, 5 c, 1 c, 3 c, 4 c, 7 c, 6 c, 0 c,
 
 $5E10 constant hdr      \ 16 bytes: the saved source's header
 $5C00 constant pbuf     \ 256 bytes: one flash page
+$5F00 constant lbuf     \ 256 bytes: the piece of saved source being interpreted
 variable fsrc        \ bytes of saved source still to be read by KEY
 variable fcr         \ KEY owes a CR (the source did not end in one)
+variable loff        \ flash offset of the next piece
+variable lpos        \ next byte in LBUF
+variable lend        \ bytes in LBUF
 variable slen
 variable soff
 variable s-state     \ the saved source as last checked: 0 none, 1 stored, 2 damaged
@@ -302,9 +306,18 @@ variable s-crchi
   text-crc s-crchi @ = swap s-crclo @ = and if 1 else 2 then s-state ! ;
 \ length of the saved source if header and CRC are right, else 0
 : source? ( -- len | 0 ) scan-source s-state @ 1 = if s-len @ else 0 then ;
-: fkey ( -- c ) -1 fsrc +! 0 spi fsrc @ 0= if f-end dup 13 <> fcr ! then ;
+\ The saved source is read in pieces of 256 bytes, so the flash is selected only
+\ while a piece is copied: the source itself may use the flash and the accelerometer.
+: lfill ( -- )
+  fsrc @ 256 umin lend ! 0 lpos !
+  loff @ 1 f-read lend @ 0 do 0 spi lbuf i + c! loop f-end
+  lend @ loff +! ;
+: fkey ( -- c )
+  lpos @ lend @ = if lfill then
+  lbuf lpos @ + c@ 1 lpos +! -1 fsrc +!
+  fsrc @ 0= if dup 13 <> fcr ! then ;
 : echo? ( -- f ) fsrc @ fcr @ or 0= ;
-: (load) ( len -- ) ?dup if fsrc ! 0 1 f-read then ;
+: (load) ( len -- ) ?dup if fsrc ! 0 loff ! 0 lpos ! 0 lend ! then ;
 : load-source ( -- ) source? (load) ;
 : write-hdr ( -- ) 0 0 f-erase hdr 16 0 0 f-prog ;
 : make-hdr ( flags -- )
@@ -507,7 +520,7 @@ variable pp
   0 serving ! ;
 : service? ( -- )
   serving @ if exit then
-  fsrc @ fcr @ or if exit then      \ the saved source is being read from the flash
+  $8022 @ 5 and if exit then        \ a word is talking to the flash or the accelerometer
   begin soh? while serve repeat ;
 
 \ ---------------------------------------------------------------------------
@@ -537,9 +550,9 @@ variable sn
 \ Free code space (below 0x4000) and data RAM; BUFFER: name gives n bytes of data RAM
 : unused ( -- n ) $4000 here - ;
 : unused-data ( -- n ) data-end dp2 @ - ;
-: buffer: ( n "name" -- )
+: buffer: ( n "name" -- )      \ the size is rounded up to even: cells stay aligned
   dup unused-data u> if drop ."  data RAM full" cr abort then
-  dp2 @ swap dp2 +! constant ;
+  1+ -2 and dp2 @ swap dp2 +! constant ;
 
 \ ---------------------------------------------------------------------------
 \ Parsing

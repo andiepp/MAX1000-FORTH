@@ -137,6 +137,19 @@ term = b.type('$5BFE @ . 1234 $5BFE ! $5BFE @ . 99 $6000 ! $6000 @ .')
 check('data RAM and its end', '1234 0' in term, term)
 term = b.type('20 buffer: buf  buf . unused-data .')
 check('buffer:', '16384 7148' in term, term)
+term = b.type('3 buffer: odd  4 buffer: next  next odd - .')
+check('buffer: keeps cells aligned', 'next odd - . 4' in term, term)
+
+# a request arriving while a word holds the flash selected waits until it lets go
+b.m.rx += b': rd 0 0 f-read 300 ms 0 spi f-end . ;\r'
+b.run()
+b.output()
+b.m.rx += b'rd\r' + bytes([SOH]) + b'board\n'
+b.run()
+term, answers, events = b.output()
+pos = dict(e for e in events if e[0] == 'term-pos')
+check('no answer while the flash is selected', len(answers) == 1 and
+      term[:pos.get('term-pos', 0)].strip().startswith('rd 255'), (term, events))
 
 b.type('3 output 3 high 1000 0 pwm-hz 500 0 pwm-duty 5 0 pwm-pin $a5 led!')
 head, pl = one(b.request('board')[1])
