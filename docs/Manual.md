@@ -975,6 +975,13 @@ The digital pins are numbered after their labels on the board:
 | 0..14 | D0..D14 | the Arduino-style digital header |
 | 16..23 | PIO_01..PIO_08 | the Pmod header (PIO1..PIO8 in the app) |
 
+![MAX1000 pinout](images/max1000-pinout.png)
+
+*The MAX1000's headers (pinout image: Trenz Electronic, TEI0001-02). D0..D14 are Forth's
+pins 0..14, PIO_01..PIO_08 are pins 16..23; AIN, AIN0..AIN7 are the analog inputs 8 and
+0..7 of `adc@` (section 5.12). Any of the 23 digital pins can carry a PWM channel, the DDS
+or a signal of a serial interface (sections 5.13 to 5.15). All I/O is 3.3 V only.*
+
 Pin 15 and pins 24 and up do not exist; the pin words answer ` bad pin` for them. Every
 pin is an **input after start-up** and after Ctrl-R. `output` makes it drive the level of
 its output latch, which starts low.
