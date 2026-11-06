@@ -339,6 +339,11 @@ Both are answers of the kernel; **↻** asks again.
   : cnt 10 0 do i . loop ;       (See)
   ```
 
+  ![See: the word bench decompiled while it runs](images/app-see.png)
+
+  *See on `bench` from `examples/bench.fs` while it runs: the source comes back without its
+  comments; a long word is laid out one line per loop.*
+
 ### 2.7 The saved source
 
 The serial flash keeps one Forth source. With **autostart** on, Forth reads it after the
