@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.1 — 2026-11-06
+
+- **The MAX1000-FORTH app** comes with the release: `app/Max1000Forth.exe`, one program for
+  64-bit Windows without installation (terminal, editor, data stack, dictionary, saved
+  source, board view). Its source is in `app/` (C#, WPF, .NET 10); F1 opens this release's
+  manual; settings in `%LocalAppData%/MAX1000-FORTH`.
+- The README and the manual describe the bundled app and no longer refer to other projects;
+  the manual has the board's pinout (section 5.11) and a new screenshot.
+- Firmware unchanged (1.3).
+
 ## 1.3 — 2026-11-06
 
 - **Serial interfaces on any pin** (after ZYNQ-FPGA-FORTH32 3.1): two UARTs (8N1, 3 Bd to

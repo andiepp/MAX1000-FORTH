@@ -1,12 +1,11 @@
 # MAX1000-FORTH
 
 An interactive 16-bit Forth on its own CPU, in the FPGA of a Trenz **MAX1000** (TEI0001-02,
-Intel MAX 10 10M08SAU169C8G). The CPU is **HF16**, the Forth processor of
-[ZYNQ-FORTH](https://github.com/andiepp/ZYNQ-FORTH); here it runs alone, with no soft
-processor and no loader: the Forth kernel is part of the FPGA configuration, and Forth talks
+Intel MAX 10 10M08SAU169C8G). The CPU is **HF16**, a 16-bit Forth processor built in the
+FPGA; it runs alone, with no soft processor and no loader: the Forth kernel is part of the FPGA configuration, and Forth talks
 straight to the board's USB serial port.
 
-![The Windows app with the MAX1000 running examples/bench.fs](docs/images/app-max1000.png)
+![The MAX1000-FORTH app with the MAX1000 running examples/bench.fs](docs/images/app-max1000.png)
 
 - **HF16** at 48 MHz, one Forth primitive per clock, with 24 KB of RAM: 16 KB for code and
   the dictionary, 8 KB data RAM.
@@ -18,8 +17,8 @@ straight to the board's USB serial port.
   MAX 10's temperature sensor; the on-board LIS3DH accelerometer.
 - **Saved source:** one Forth source in the board's 8 MB serial flash runs at every start;
   hold the user button (or send ESC) to skip it.
-- **Any terminal** (PuTTY, Tera Term) talks to Forth at 115200 baud. The
-  [Windows app](https://github.com/andiepp/ZYNQ-FORTH/releases) (2.4.4 and later) adds an
+- **Any terminal** (PuTTY, Tera Term) talks to Forth at 115200 baud. The **MAX1000-FORTH
+  app** for Windows (in the release zip: `app\Max1000Forth.exe`, no installation) adds an
   editor, the data stack, the dictionary, the saved source and a live view of the board: the
   kernel answers its service requests itself.
 
@@ -38,7 +37,7 @@ straight to the board's USB serial port.
    ```
 
 4. Open the board's second serial port (the FTDI's channel B) at **115200 8N1** in a
-   terminal or the ZYNQ-FORTH app, press Enter, and type Forth:
+   terminal or the MAX1000-FORTH app (`app\Max1000Forth.exe`), press Enter, and type Forth:
 
    ```
    HF16 Forth on MAX1000
@@ -86,7 +85,7 @@ python tools/mforth.py -p COMx --skip                      # restart without it
 
 ## Building
 
-Needs Quartus Prime Lite 18.1 (MAX 10 support) and Python 3.
+Needs Quartus Prime Lite 18.1 (MAX 10 support) and Python 3; the app needs the .NET 10 SDK.
 
 ```powershell
 scripts\build.ps1                      # kernel + FPGA (build\output_files\max1000_forth.pof/.sof)
@@ -97,7 +96,8 @@ python sim\test_protocol.py            # simulator tests: the app's service requ
 python sim\test_serial.py              # simulator tests: UART, SPI, I2C, pin owners
 sim\run_serial.ps1                     # Verilog testbench of UART/SPI/I2C (Vivado 2023.2)
 python tools\hf16.py run forth\kernel.fs -i "2 3 + ."      # the kernel in the simulator
-scripts\Build-Release.ps1 -Version 1.3                      # release zip in dist\
+dotnet test app\Max1000Forth.slnx                             # the app's tests
+scripts\Build-Release.ps1 -Version 1.3.1                    # release zip in dist\ (with the app)
 ```
 
 `build.ps1` finds Quartus via `-Quartus`, `QUARTUS_ROOTDIR` or `<drive>:\Quartus\18.1\quartus`.
@@ -108,7 +108,7 @@ multiplier elements, with about 1.0 ns of slack at 48 MHz (CPU) and at 192 MHz (
 
 | Path | Content |
 |---|---|
-| `rtl/` | Verilog: `hf16_cpu.v` (from ZYNQ-FORTH), `max1000_forth.v` (top), FIFOs, UART, PWM, DDS, ADC scanner, SPI master; UART, SPI and I2C for the pins (`uart_port.v`, `spi_port.v`, `i2c_port.v`) |
+| `rtl/` | Verilog: `hf16_cpu.v` (the HF16 CPU), `max1000_forth.v` (top), FIFOs, UART, PWM, DDS, ADC scanner, SPI master; UART, SPI and I2C for the pins (`uart_port.v`, `spi_port.v`, `i2c_port.v`) |
 | `forth/kernel.fs` | the Forth kernel |
 | `tools/hf16.py` | cross-compiler and instruction-set simulator |
 | `tools/mforth.py` | line sender and source store |
@@ -118,8 +118,8 @@ multiplier elements, with about 1.0 ns of slack at 48 MHz (CPU) and at 192 MHz (
 | `sim/` | simulator tests and the testbench of the serial interfaces |
 | `docs/` | user manual, implementation details, images |
 | `examples/` | example programs |
+| `app/` | the MAX1000-FORTH app for Windows (C#, WPF, .NET 10): terminal, editor, stack, dictionary, saved source, board view |
 
 ## License
 
-MIT, see [LICENSE](LICENSE). HF16, the kernel's core and the tools come from
-[ZYNQ-FORTH](https://github.com/andiepp/ZYNQ-FORTH).
+MIT, see [LICENSE](LICENSE).

@@ -1947,21 +1947,27 @@ double-number literals, the drive register behind the `ports` line and the `fn` 
 `board` answer; a typed `cold` now switches the units off. All are published at
 [github.com/andiepp/MAX1000-FORTH](https://github.com/andiepp/MAX1000-FORTH).
 
-## 8 The Windows app
+## 8 The MAX1000-FORTH app
 
-MAX1000-FORTH has no app of its own: the **ZYNQ-FORTH app** (2.4 and later, C#/WPF, in the
-ZYNQ-FORTH repository) serves both boards. Everything it shows comes through protocol 1, so
-any other program can do the same (`tools/zforth.py` of ZYNQ-FORTH is a command-line
-example).
+The app lives in `app/` (C#, WPF, .NET 10). `scripts/Build-Release.ps1` publishes it as one
+self-contained program, `Max1000Forth.exe`, into the release zip (`app\`). Its source began
+as a copy of the HF16's earlier Windows app (release 2.4.4), renamed: product and window
+title MAX1000-FORTH, program `Max1000Forth.exe`, settings in `%LocalAppData%\MAX1000-FORTH`,
+and the Manual button opens this repository's `docs/Manual.pdf`, embedded at build time. The
+internal project and namespace names (`ZynqForth.*`) were kept, and the code for the other
+board (its board view and pattern editor) is still there but never shown with a MAX1000.
+Everything the app shows comes through protocol 1, so any other program can do the same
+(`tools/mforth.py` is a command-line example). `dotnet test app\Max1000Forth.slnx` runs its
+59 tests.
 
-| Part (ZYNQ-FORTH `app/src`) | What it does for the MAX1000 |
+| Part (`app/src`) | What it does for the MAX1000 |
 |---|---|
 | `ZynqForth.Core/Board/BoardModels.cs` | `BoardVersion.Kind`: the `firmware` line of the `version` answer names `max1000-forth`, so the board is a `BoardKind.Max1000` (else `Zynq`); `Product` gives "MAX1000-FORTH" for messages |
 | `ViewModels/MainViewModel.cs` | after connecting, `SetBoardKind`; for a MAX1000 it sets `client.InputWindow` = 4 KB and `client.RestartByCtrlR` = true, hides the Pattern tab (the MAX1000 has no pattern generator) and remembers the kind; the board view polls `board` every 250 ms, the status line `status` every 1.5 s |
 | `ZynqForth.Core/Board/BoardClient.cs` | `SendTextAsync` ("Run all") sends text only while `InputWindow` minus the `input` of `status` leaves at least 1 KB, so a piece is at most 4 KB and the 8 KB RX FIFO never overflows; `RestartAsync` sends Ctrl-R, or Ctrl-R and ESC for "Restart clean", instead of the `restart` request |
 | `ZynqForth.Core/Board/Max1000State.cs` | parses the `board` answer: LEDs, button, both ports (levels and driven), PWM enables and pins, the 9 ADC codes mapped to AIN0..AIN7 and AIN (the same table as the kernel's `ain`), the temperature (the same interpolation as `temp@`) and the accelerometer; the `dds` and `fn` lines are not decoded, but the DDS pin and the serial output pins show as driven pins |
 | `Controls/Max1000View.cs` | draws the MAX1000: 8 LEDs, the USER button, the chip temperature and the tilt in g, the PWM channels and their pins, the 23 pins (input, output high/low, PWM), bars for the 9 analog inputs in volts |
-| `Views/MainWindow.xaml.cs` | `OpenManual` (Manual button, F1): for a MAX1000 it opens the MAX1000-FORTH manual embedded in the app, written to `%LocalAppData%\ZYNQ-FORTH` |
+| `Views/MainWindow.xaml.cs` | `OpenManual` (Manual button, F1): opens the manual embedded in the app (`docs/Manual.pdf`), written to `%LocalAppData%\MAX1000-FORTH` |
 
 Why the smaller input window: on the Zynq the ARM keeps a 64 KB input ring and answers at
 once; on the MAX1000 a `status` request queued behind 16 KB of text would be answered only
@@ -1969,8 +1975,8 @@ after Forth has compiled all of it. With 4 KB pieces each answer comes quickly a
 progress display stays live. Why Ctrl-R: the `restart` request is answered only when Forth
 waits, Ctrl-R always.
 
-The current app, 2.4.4, was made for release 1.2. It looks up the lines of the `board`
-answer by name and does not read the `fn` line yet: the output pins of a serial interface
+The app looks up the lines of the `board` answer by name and does not read the `fn` line
+yet: the output pins of a serial interface
 (TX, SCK, MOSI, and SCL or SDA while pulled low) appear as plain outputs through the drive
 mask of `ports`, and its input pins as inputs, without their function.
 

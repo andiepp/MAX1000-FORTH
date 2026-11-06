@@ -5,21 +5,25 @@
 
 .DESCRIPTION
     1. Runs the simulator tests (sim\run_flash_tests.ps1, sim\test_protocol.py, sim\test_serial.py).
-    2. Builds the kernel and the FPGA configuration (scripts\build.ps1).
+    2. Builds the kernel and the FPGA configuration (scripts\build.ps1; -SkipFpga uses the
+       existing build\output_files).
     3. Builds docs\Manual.pdf and docs\Implementation-Details.pdf (needs Python with 'markdown' and Microsoft Edge; skipped with
        -SkipPdf, then the committed PDFs are used).
-    4. Writes dist\MAX1000-FORTH-<version>.zip: firmware (pof, sof, program_flash.ps1),
+    4. Tests and publishes the MAX1000-FORTH app (needs the .NET 10 SDK): app\Max1000Forth.exe,
+       one self-contained program with docs\Manual.pdf embedded.
+    5. Writes dist\MAX1000-FORTH-<version>.zip: firmware (pof, sof, program_flash.ps1), app,
        docs (Manual.pdf, Implementation-Details.pdf, design.md, images), tools (mforth.py, hf16.py), examples, README,
        CHANGELOG, LICENSE.
 
 .EXAMPLE
-    .\scripts\Build-Release.ps1 -Version 1.3
+    .\scripts\Build-Release.ps1 -Version 1.3.1
 #>
 [CmdletBinding()]
 param(
-    [string]$Version = '1.3',
+    [string]$Version = '1.3.1',
     [switch]$SkipTests,
-    [switch]$SkipPdf
+    [switch]$SkipPdf,
+    [switch]$SkipFpga
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
@@ -36,7 +40,7 @@ try {
         python sim\test_serial.py
         if ($LASTEXITCODE) { throw 'serial tests failed' }
     }
-    & (Join-Path $root 'scripts\build.ps1')
+    if (-not $SkipFpga) { & (Join-Path $root 'scripts\build.ps1') }
     if (-not $SkipPdf) {
         python tools\manual_contents.py           # the manual's contents list from its headings
         if ($LASTEXITCODE) { throw 'manual contents failed' }
@@ -46,8 +50,20 @@ try {
         }
     }
 
+    # the app, after the PDFs: it embeds docs\Manual.pdf
+    $appOut = Join-Path $root 'build\app-publish'
+    if (-not $SkipTests) {
+        dotnet test app\Max1000Forth.slnx
+        if ($LASTEXITCODE) { throw 'app tests failed' }
+    }
+    if (Test-Path $appOut) { Remove-Item -Recurse -Force $appOut }
+    dotnet publish app\src\ZynqForth\ZynqForth.csproj -c Release -r win-x64 --self-contained `
+        -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:Version="$Version.0" -o $appOut
+    if ($LASTEXITCODE) { throw 'app publish failed' }
+
     if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
-    foreach ($d in 'firmware', 'docs', 'tools') { New-Item -ItemType Directory -Force (Join-Path $stage $d) | Out-Null }
+    foreach ($d in 'firmware', 'docs', 'tools', 'app') { New-Item -ItemType Directory -Force (Join-Path $stage $d) | Out-Null }
+    Copy-Item (Join-Path $appOut 'Max1000Forth.exe') (Join-Path $stage 'app')
     Copy-Item build\output_files\max1000_forth.pof, build\output_files\max1000_forth.sof, scripts\program_flash.ps1 `
         (Join-Path $stage 'firmware')
     Copy-Item docs\Manual.pdf, docs\Implementation-Details.pdf, docs\design.md (Join-Path $stage 'docs')

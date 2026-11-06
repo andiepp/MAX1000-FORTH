@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>ZynqForth</RootNamespace>
+    <AssemblyName>Max1000Forth</AssemblyName>
+    <AssemblyTitle>MAX1000-FORTH</AssemblyTitle>
+    <!-- the exe's icon (Explorer, taskbar); app/tools/make_icon.py draws it -->
+    <ApplicationIcon>ZynqForth.ico</ApplicationIcon>
+    <Description>MAX1000-FORTH: terminal, editor, dictionary and board view for the HF16 Forth on the Trenz MAX1000.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ZynqForth.Core\ZynqForth.Core.csproj" />
+  </ItemGroup>
+
+  <!-- the window's icon (title bar, Alt-Tab) -->
+  <ItemGroup>
+    <Resource Include="ZynqForth.ico" />
+  </ItemGroup>
+
+  <!-- the user manual (docs/Manual.pdf of this repository), opened by the Manual button -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\..\docs\Manual.pdf" LogicalName="Max1000Forth.Manual.pdf" />
+  </ItemGroup>
+
+</Project>

@@ -1,11 +1,10 @@
 # MAX1000-FORTH — User Manual
 
 MAX1000-FORTH is a small interactive Forth system for the Trenz **MAX1000** (TEI0001-02,
-Intel MAX 10 10M08SAU169C8G). Its CPU, the **HF16**, is the 16-bit stack machine of
-[ZYNQ-FORTH](https://github.com/andiepp/ZYNQ-FORTH), built in the FPGA. Every HF16
+Intel MAX 10 10M08SAU169C8G). Its CPU, the **HF16**, is a 16-bit stack machine built in the FPGA. Every HF16
 instruction is a Forth primitive. There is no soft processor and no second processor:
 the Forth kernel is part of the FPGA configuration, and Forth talks directly over the
-board's USB serial port, where the **Windows app** or any terminal program talks to it.
+board's USB serial port, where the **MAX1000-FORTH app** or any terminal program talks to it.
 
 Besides the board's 8 LEDs and its user button, Forth reaches the 23 digital pins of the
 Arduino-style header and the Pmod header, with four PWM channels, a DDS square-wave
@@ -15,7 +14,7 @@ the temperature diode of the MAX 10's built-in converter, the board's LIS3DH
 at every start.
 
 This manual covers how to use the system, how the implementation works, and every word in
-the kernel. It describes MAX1000-FORTH 1.3. For the hardware details (I/O map, pins, ADC
+the kernel. It describes MAX1000-FORTH 1.3.1 (firmware 1.3). For the hardware details (I/O map, pins, ADC
 channels, service requests), see [design.md](design.md).
 
 Contents:
@@ -25,7 +24,7 @@ Contents:
   - [1.2 Put MAX1000-FORTH on the board](#12-put-max1000-forth-on-the-board)
   - [1.3 Connect](#13-connect)
   - [1.4 First session](#14-first-session)
-- **[2. The Windows app](#2-the-windows-app)**
+- **[2. The MAX1000-FORTH app](#2-the-max1000-forth-app)**
   - [2.1 Connecting](#21-connecting)
   - [2.2 The layout](#22-the-layout)
   - [2.3 How the app talks to the MAX1000](#23-how-the-app-talks-to-the-max1000)
@@ -102,8 +101,8 @@ Contents:
 - On the PC, to write MAX1000-FORTH into the board once: the **Arrow USB Blaster** driver
   for that built-in programmer and Intel's **Quartus Prime Programmer** software, either
   the standalone Programmer or the one that comes with Quartus Prime.
-- To work with it: on Windows the **Windows app** (chapter 2). Any system can use a terminal
-  program instead.
+- To work with it: on Windows the **MAX1000-FORTH app**, which comes with the release
+  (chapter 2). Any system can use a terminal program instead.
 - Optionally Python 3 with pyserial (`pip install pyserial`) for `tools/mforth.py`, which
   sends files and saves a source in the board's flash from the command line.
 
@@ -121,6 +120,7 @@ release, or the repository. Commands run in that folder.
    | `firmware\max1000_forth.pof` | the configuration for the MAX 10's internal flash |
    | `firmware\max1000_forth.sof` | the same configuration for the FPGA only, until power-off |
    | `firmware\program_flash.ps1` | writes one of the two to the board |
+   | `app\Max1000Forth.exe` | the MAX1000-FORTH app for Windows (chapter 2) |
    | `tools\mforth.py` | sends lines and files, saves a source in the flash |
    | `examples\` | Forth examples (`bench.fs`, section 6.8) |
    | `docs\` | this manual (`Manual.pdf`) and the implementation details (`Implementation-Details.pdf`, `design.md`) |
@@ -194,14 +194,12 @@ read it. The **USER** button beside it belongs to Forth (`btn@`, section 5.10).
 
 ---
 
-## 2. The Windows app
+## 2. The MAX1000-FORTH app
 
-The Windows app is published together with the HF16's first home, so it is downloaded from
-there: `ZYNQ-FORTH-<version>-windows-x64.zip`, release 2.4.4 or later, from
-[the app's releases](https://github.com/andiepp/ZYNQ-FORTH/releases). Unpack it and start
-**ZynqForth.exe**. The app recognises the MAX1000 by its answer to the `version` request and
-adapts itself; its **Manual** button (F1) then opens this manual. This chapter covers what
-you need with a MAX1000.
+The release contains the **MAX1000-FORTH app** for Windows (64-bit Windows 10 or 11):
+`app\Max1000Forth.exe`, a single program that needs no installation. Copy it anywhere and
+start it; a desktop shortcut to it is convenient. Its settings are kept in
+`%LocalAppData%\MAX1000-FORTH`, and its **Manual** button (F1) opens this manual.
 
 The app is a small development environment for the HF16 on Windows:
 
@@ -212,18 +210,18 @@ The app is a small development environment for the HF16 on Windows:
 - the **board view**: LEDs, user button, digital pins, PWM channels and analog inputs, live;
 - five **skins**.
 
-![The Windows app with the MAX1000 running examples/bench.fs](images/app-max1000.png)
+![The MAX1000-FORTH app with the MAX1000 running examples/bench.fs](images/app-max1000.png)
 
 *The IDE dark skin after **Run all** of `examples/bench.fs` and `bench` (section 6.8): the
-potentiometer on AIN3 stands at about 2.5 V, so LED1 to LED6 are lit and PWM channel 0
-drives D3; D4 and D5 are outputs at 0, and a status line comes every 500 ms.*
+potentiometer on AIN3 stands at about 1.8 V, so LED1 to LED4 are lit and PWM channel 0
+drives D3; D4 is an output at 0, D5 blinks, and a status line comes every 500 ms.*
 
 ### 2.1 Connecting
 
-1. Start **ZynqForth.exe**.
+1. Start **Max1000Forth.exe**.
 2. Choose the board's port in the list at the top left (**↻** looks for ports again) and click
    **Connect**. The app remembers the port.
-3. The line beside the button shows the port, *MAX1000-FORTH firmware 1.0* and the size of
+3. The line beside the button shows the port, *MAX1000-FORTH firmware 1.3* and the size of
    the kernel image. The data stack, dictionary and saved-source boxes fill.
 
 If the board does not answer, the app says so and disconnects: check that MAX1000-FORTH is
@@ -231,7 +229,7 @@ on the board (chapter 1), that you chose channel B's port, and that no other pro
 port open. **Disconnect** frees the port for a terminal program. While the app is connected,
 only it can use the port.
 
-Start options, for a shortcut: `ZynqForth.exe [--skin "Lab panel"] [--connect [COMx]] [file.fs]`
+Start options, for a shortcut: `Max1000Forth.exe [--skin "Lab panel"] [--connect [COMx]] [file.fs]`
 connects at once (to COMx, or without it to the port the app remembers), chooses a skin, or
 opens a file in the editor.
 
@@ -362,8 +360,8 @@ board as Forth sees it, read several times a second:
   the `board` answer carries them (section 4.8);
 - the **analog inputs** AIN0..AIN7 and AIN as bars with their voltage, 0 to 3.3 V
   (section 5.12);
-- the chip **temperature** and the **tilt** from the accelerometer in g (x, y, z), with an
-  app newer than 2.4 (sections 5.12 and 5.16).
+- the chip **temperature** and the **tilt** from the accelerometer in g (x, y, z)
+  (sections 5.12 and 5.16).
 
 The view only reads: Forth's I/O is never changed by it. It is updated only while Forth
 answers (section 2.3).
@@ -521,20 +519,19 @@ has loaded its configuration. The serial port is connected straight to the CPU's
 
 | Part | File |
 |---|---|
-| HF16 CPU (from ZYNQ-FORTH; only a RAM-style hint for the stacks added) | `rtl/hf16_cpu.v` |
+| HF16 CPU | `rtl/hf16_cpu.v` |
 | Top level: PLL, RAM, UART, I/O registers, pins | `rtl/max1000_forth.v` |
 | UART and its FIFOs | `rtl/uart.v`, `rtl/fifo_bram.v` |
-| PWM (from ZYNQ-FORTH) | `rtl/pwm.v` |
+| PWM | `rtl/pwm.v` |
 | DDS square-wave generator | `rtl/dds.v` |
-| UART, SPI master, I2C master for the pins (after ZYNQ-FPGA-FORTH32) | `rtl/uart_port.v`, `rtl/spi_port.v`, `rtl/i2c_port.v` |
+| UART, SPI master, I2C master for the pins | `rtl/uart_port.v`, `rtl/spi_port.v`, `rtl/i2c_port.v` |
 | ADC scanner around Intel's Modular ADC core | `rtl/adc_scan.v` |
 | SPI master (flash, accelerometer) and CRC-32 unit | `rtl/spi_flash.v` |
 | Forth kernel, written in Forth | `forth/kernel.fs` |
 | Cross-compiler and simulator | `tools/hf16.py` |
 | Line sender, source storing | `tools/mforth.py` |
 | Build scripts | `scripts/build.ps1`, `scripts/build.tcl` |
-
-The Windows app is described in chapter 2.
+| The MAX1000-FORTH app (C#, WPF; chapter 2) | `app/` |
 
 ### 4.2 The HF16 CPU
 
@@ -553,7 +550,8 @@ The Windows app is described in chapter 2.
 - Jumps and calls hold 13-bit cell addresses, so **code must lie in the first 16 KB** of the
   RAM. The 8 KB above are for data only.
 
-The instruction encoding is described in ZYNQ-FORTH's `docs/design.md`; it is the same here.
+The instruction encoding is described in the implementation details (`docs/design.md`,
+`Implementation-Details.pdf`, chapter 3).
 
 ### 4.3 Memory map
 
@@ -689,7 +687,7 @@ dictionary is reset and the saved source runs again, but the pins keep their sta
 ### 4.7 The saved source (autostart)
 
 One Forth source can be kept in the serial flash (from the app, section 2.7, or with
-`python tools/mforth.py -p COMx --store file.fs`). It lives in the ZYNQ-FORTH format:
+`python tools/mforth.py -p COMx --store file.fs`). Its format:
 
 | Flash address | Content |
 |---|---|
@@ -723,9 +721,9 @@ source runs, wherever it waits (`ms`, `key?`, output).
 
 ### 4.8 Service requests (the app)
 
-The app speaks protocol 1 of ZYNQ-FORTH (ZYNQ-FORTH's `docs/Protocol.md`): a request is the
-byte SOH (0x01), a line of text and LF; the answer is `SOH ok <name> <length> LF <payload>`
-or `SOH err <name> <reason> LF`. On the Zynq board an ARM answers; here the kernel does.
+The app speaks service protocol 1: a request is the byte SOH (0x01), a line of text and LF;
+the answer is `SOH ok <name> <length> LF <payload>` or `SOH err <name> <reason> LF`. The
+kernel answers it itself.
 
 Requests arrive in the receive FIFO between terminal bytes. `service?` answers every
 request at the head of the FIFO; `key?` calls it and decides on the head byte itself, so a
@@ -1186,8 +1184,7 @@ DDS registers are at `$8060`:
 
 ### 5.15 Serial interfaces: UART, SPI, I2C
 
-Two **UARTs**, two **SPI** masters and an **I2C** master run in the FPGA, as in
-ZYNQ-FPGA-FORTH32, and put each of their signals on **any digital pin** (section 5.11). They
+Two **UARTs**, two **SPI** masters and an **I2C** master run in the FPGA and put each of their signals on **any digital pin** (section 5.11). They
 work on their own once started: a UART receives into its buffer while Forth computes, and an
 SPI or I2C transfer runs while Forth waits for it.
 
