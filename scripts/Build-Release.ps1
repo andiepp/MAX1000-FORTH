@@ -61,6 +61,18 @@ try {
         -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:Version="$Version.0" -o $appOut
     if ($LASTEXITCODE) { throw 'app publish failed' }
 
+    # the repository's own copies, so that GitHub's "Code > Download ZIP" works as well:
+    # firmware\ (pof, sof, program_flash.ps1) and app\Max1000Forth.exe in its small form,
+    # which needs the .NET 10 Desktop Runtime (the zip gets the self-contained one)
+    Copy-Item build\output_files\max1000_forth.pof, build\output_files\max1000_forth.sof, scripts\program_flash.ps1 `
+        (Join-Path $root 'firmware')
+    $appFd = Join-Path $root 'build\app-fd'
+    if (Test-Path $appFd) { Remove-Item -Recurse -Force $appFd }
+    dotnet publish app\src\ZynqForth\ZynqForth.csproj -c Release -r win-x64 --self-contained false `
+        -p:PublishSingleFile=true -p:Version="$Version.0" -o $appFd
+    if ($LASTEXITCODE) { throw 'app publish (framework-dependent) failed' }
+    Copy-Item (Join-Path $appFd 'Max1000Forth.exe') (Join-Path $root 'app\Max1000Forth.exe')
+
     if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
     foreach ($d in 'firmware', 'docs', 'tools', 'app') { New-Item -ItemType Directory -Force (Join-Path $stage $d) | Out-Null }
     Copy-Item (Join-Path $appOut 'Max1000Forth.exe') (Join-Path $stage 'app')

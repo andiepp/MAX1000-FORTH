@@ -111,9 +111,11 @@ Contents:
 Paths in this manual are relative to the **MAX1000-FORTH folder**: the folder of an unpacked
 release, or the repository. Commands run in that folder.
 
-1. Download `MAX1000-FORTH-1.3.zip` (or a later release) from
-   [the releases](https://github.com/andiepp/MAX1000-FORTH/releases) and unpack it. It
-   holds:
+1. Download `MAX1000-FORTH-1.3.1.zip` (or a later release) from
+   [the releases](https://github.com/andiepp/MAX1000-FORTH/releases), under *Assets*, and
+   unpack it. (GitHub's **Code → Download ZIP** of the repository works too: it has the same
+   `firmware` folder and app, plus the sources; its app needs the .NET 10 Desktop Runtime,
+   section 2.) The release zip holds:
 
    | Path | Content |
    |---|---|
@@ -198,7 +200,9 @@ read it. The **USER** button beside it belongs to Forth (`btn@`, section 5.10).
 
 The release contains the **MAX1000-FORTH app** for Windows (64-bit Windows 10 or 11):
 `app\Max1000Forth.exe`, a single program that needs no installation. Copy it anywhere and
-start it; a desktop shortcut to it is convenient. Its settings are kept in
+start it; a desktop shortcut to it is convenient. (The copy in the repository, which **Code →
+Download ZIP** gives, is the small build: it needs Microsoft's free .NET 10 Desktop Runtime,
+which Windows offers to download when the app first starts without it.) Its settings are kept in
 `%LocalAppData%\MAX1000-FORTH`, and its **Manual** button (F1) opens this manual.
 
 The app is a small development environment for the HF16 on Windows:

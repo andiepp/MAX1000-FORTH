@@ -25,7 +25,9 @@ straight to the board's USB serial port.
 ## Get started
 
 1. Download `MAX1000-FORTH-<version>.zip` from the
-   [releases](https://github.com/andiepp/MAX1000-FORTH/releases) and unpack it.
+   [releases](https://github.com/andiepp/MAX1000-FORTH/releases) (under *Assets*), or the
+   repository with **Code → Download ZIP**, and unpack it. Both have the firmware in
+   `firmware\` and the app as `app\Max1000Forth.exe`.
 2. Install the **Arrow USB Blaster** driver (the MAX1000 has its programmer on board, so no
    other hardware is needed) and the **Quartus Prime Programmer** (or Quartus Prime Lite,
    which contains it).
@@ -37,7 +39,10 @@ straight to the board's USB serial port.
    ```
 
 4. Open the board's second serial port (the FTDI's channel B) at **115200 8N1** in a
-   terminal or the MAX1000-FORTH app (`app\Max1000Forth.exe`), press Enter, and type Forth:
+   terminal or the MAX1000-FORTH app (`app\Max1000Forth.exe`), press Enter, and type Forth.
+   The app from the release zip runs as it is; the one from Code → Download ZIP is the small
+   build and needs Microsoft's free .NET 10 Desktop Runtime (Windows offers it on the first
+   start).
 
    ```
    HF16 Forth on MAX1000
@@ -118,7 +123,8 @@ multiplier elements, with about 1.0 ns of slack at 48 MHz (CPU) and at 192 MHz (
 | `sim/` | simulator tests and the testbench of the serial interfaces |
 | `docs/` | user manual, implementation details, images |
 | `examples/` | example programs |
-| `app/` | the MAX1000-FORTH app for Windows (C#, WPF, .NET 10): terminal, editor, stack, dictionary, saved source, board view |
+| `firmware/` | the released FPGA configuration (`.pof`, `.sof`) and `program_flash.ps1`, as in the release zip |
+| `app/` | the MAX1000-FORTH app for Windows (C#, WPF, .NET 10): terminal, editor, stack, dictionary, saved source, board view; `Max1000Forth.exe` built (needs the .NET 10 Desktop Runtime) |
 
 ## License
 
