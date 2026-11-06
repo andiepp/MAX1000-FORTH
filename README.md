@@ -1,11 +1,31 @@
-# MAX1000-FORTH
+# MAX1000 FPGA FORTH
 
-An interactive 16-bit Forth on its own CPU, in the FPGA of a Trenz **MAX1000** (TEI0001-02,
-Intel MAX 10 10M08SAU169C8G). The CPU is **HF16**, a 16-bit Forth processor built in the
-FPGA; it runs alone, with no soft processor and no loader: the Forth kernel is part of the FPGA configuration, and Forth talks
-straight to the board's USB serial port.
+**An interactive 16-bit Forth on the Trenz MAX1000**
 
-![The MAX1000-FORTH app with the MAX1000 running examples/bench.fs](docs/images/app-max1000.png)
+![MAX1000 FPGA FORTH: the hardware in the MAX 10 FPGA and the IDE](docs/images/project-overview.png)
+
+MAX1000 FPGA FORTH puts a complete Forth system into the Intel MAX 10 FPGA of the low-cost
+Trenz MAX1000 board (TEI0001-02). Its CPU, the HF16, is a 16-bit stack machine that runs one
+Forth primitive per clock at 48 MHz. The Forth kernel is part of the FPGA configuration, so
+the board starts straight into Forth: no soft processor, no loader, and only a USB cable,
+since the programmer is built into the board.
+
+**Why Forth?** Forth is interactive: type a line and it runs at once, with no
+compile-and-flash cycle. It is fast, small and easy to learn. That makes it ideal for trying
+out and testing chips and circuits connected to the board. Two UARTs, two SPI masters, an I²C
+master, four PWM channels and a DDS generator can each be put on any of the 23 header pins.
+You can talk to a sensor, set up a clock chip or watch a serial device in a few typed lines.
+One Forth program can be saved in the board's flash, so it runs at every start without a PC.
+
+**IDE included.** The MAX1000-FORTH app for Windows combines a source editor and a terminal
+with the data stack and the dictionary. It also shows the saved program and a live view of
+the board: LEDs, pins, PWM channels, analog inputs, temperature and tilt. F1 opens the full
+user manual.
+
+Open source (MIT): firmware, Forth kernel, cross-compiler, simulator and app, with a user
+manual and implementation details.
+
+## Features
 
 - **HF16** at 48 MHz, one Forth primitive per clock, with 24 KB of RAM: 16 KB for code and
   the dictionary, 8 KB data RAM.
