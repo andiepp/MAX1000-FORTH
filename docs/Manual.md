@@ -31,9 +31,10 @@ Contents:
   - [2.4 The terminal](#24-the-terminal)
   - [2.5 The editor](#25-the-editor)
   - [2.6 The data stack and the dictionary](#26-the-data-stack-and-the-dictionary)
-  - [2.7 The saved source](#27-the-saved-source)
-  - [2.8 The board view](#28-the-board-view)
-  - [2.9 A worked session](#29-a-worked-session)
+  - [2.7 See: a word as Forth source](#27-see-a-word-as-forth-source)
+  - [2.8 The saved source](#28-the-saved-source)
+  - [2.9 The board view](#29-the-board-view)
+  - [2.10 A worked session](#210-a-worked-session)
 - **[3. Working with the interpreter](#3-working-with-the-interpreter)**
   - [3.1 Input line](#31-input-line)
   - [3.2 Words and numbers](#32-words-and-numbers)
@@ -141,7 +142,7 @@ release, or the repository. Commands run in that folder.
 
 The internal flash keeps MAX1000-FORTH until something else is written there; it replaces
 the configuration the board had before (for example the factory demo). The 8 MB serial
-flash is a separate chip, and the Forth source you save there (section 2.7) is not touched
+flash is a separate chip, and the Forth source you save there (section 2.8) is not touched
 by programming the FPGA.
 
 To try MAX1000-FORTH without replacing the board's configuration,
@@ -323,28 +324,86 @@ Both are answers of the kernel; **↻** asks again.
   code in hex. Your own words come first.
 - The box above the list shows only the words containing its text.
 - **Double-click** a word to add it to the terminal's input line.
-- **See** shows the selected word as Forth source, decompiled from the board's memory
-  (firmware 1.4 and later). The app reads the word's code with the `mem` request
-  (section 4.8) and turns the instructions back into Forth: calls into word names, literals
-  into numbers, the jumps of `if` `else` `then`, `begin` `until` `again`, `while` `repeat` and
-  `do` `loop` into those words, and recognises `."`, `variable`, `constant` and `create`.
-  **Listing** shows every cell with its address, instruction and meaning; **To editor**
-  appends the source to the editor, **Copy** puts it on the clipboard. Comments and stack
-  comments are not stored on the board, so they cannot come back. A word with a single
-  number (`: five 5 ;`) compiles exactly like a constant and is shown as one. Kernel words
-  come back as in `forth/kernel.fs`, apart from details the cross-compiler optimised.
+- **See** (top right of the box) shows the selected word as Forth source (section 2.7).
 
-  ```
-  : cnt 10 0 do i . loop ;       (typed)
-  : cnt 10 0 do i . loop ;       (See)
-  ```
+### 2.7 See: a word as Forth source
 
-  ![See: the word bench decompiled while it runs](images/app-see.png)
+**See** decompiles a word: it reads the word's code from the board's memory and turns it back
+into Forth. It needs firmware 1.4 or later.
 
-  *See on `bench` from `examples/bench.fs` while it runs: the source comes back without its
-  comments; a long word is laid out one line per loop.*
+<img src="images/see-button.png" alt="The See button in the Dictionary box" width="300">
 
-### 2.7 The saved source
+1. Select the word in the **Dictionary** list. To find it quickly, type part of its name into
+   the box above the list.
+2. Click **See** at the top right of the Dictionary box (beside **↻**).
+3. A window opens with the word as Forth source. Its title gives the word's address range
+   and size in cells.
+
+![See: the word bench decompiled while it runs](images/app-see.png)
+
+*See on `bench` from `examples/bench.fs` while it runs: the source comes back without its
+comments; a long word is laid out one line per loop.*
+
+The window's buttons:
+
+| Button | What it does |
+|---|---|
+| **Listing** | Switches between the Forth source and the listing: every cell of the word with its address, the instruction in hex and its meaning. |
+| **Copy** | Puts the text shown on the clipboard. |
+| **To editor** | Appends the source to the editor, to change it and run it again (a new definition with the same name replaces the old one for everything compiled afterwards). |
+| **Close** | Closes the window. Several See windows can be open at once. |
+
+**How it works.** The HF16 runs Forth almost directly, so its code translates back
+instruction by instruction. The app reads the dictionary again (addresses change as you
+define words), finds where the word's code ends (at the next word's header, or at `HERE`),
+fetches the code with the `mem` request (section 4.8) and translates:
+
+| Instruction | Becomes |
+|---|---|
+| literal (bit 15 set) | a number; with a following `invert` a negative one. Values from `$4000` on are shown in hex (addresses), the address of a word as `['] name` |
+| call | the name of the word called. A call of `(.")` with the counted text behind it becomes `." text"` |
+| ALU instruction | its primitive: `dup`, `+`, `@`, `>r`, … (`!` and `c!` are two instructions); `r@` inside a loop is `i` |
+| conditional jump forward | `if`; with a jump forward just before its target `if … else … then`, with a jump back there `begin … while … repeat` |
+| conditional jump back | `until` (with `begin` at the target); after a call of `(loop)` or `(+loop)` it is `loop` or `+loop`, and the `swap >r >r` at the target is `do` |
+| jump back | `again` |
+| return | `;` at the end, `exit` in the middle |
+
+Words made by `variable`, `create` and `constant` are recognised by their two or three
+instructions and shown as `variable name`, `create name n allot` or `value constant name`.
+
+For example, the listing of `: cnt 10 0 do i . loop ;`:
+
+```
+$32B0  800A  literal 10
+$32B2  8000  literal 0
+$32B4  60C0  swap              \ swap >r >r = do
+$32B6  6087  >r
+$32B8  6087  >r
+$32BA  6601  r@                \ i
+$32BC  5405  call .
+$32BE  41F6  call (loop)
+$32C0  395D  0branch $32BA     \ back to the loop body = loop
+$32C2  660D  r>                \ r> drop r> drop = unloop
+$32C4  6083  drop
+$32C6  660D  r>
+$32C8  6083  drop
+$32CA  700C  exit              \ ;
+```
+
+(The comments on the right are added here; the app shows the first three columns.)
+
+**What cannot come back.**
+
+- Comments and stack comments are not stored on the board.
+- A word that only pushes one number (`: five 5 ;`) compiles exactly like a constant and is
+  shown as `5 constant five`.
+- Kernel words come back as in `forth/kernel.fs`, apart from details the cross-compiler
+  optimised: a final call it turned into a jump appears as the plain call, a return merged
+  into the last instruction as `;`.
+- An instruction pattern that no Forth word produces is shown in brackets, for example
+  `[jump $1234]`.
+
+### 2.8 The saved source
 
 The serial flash keeps one Forth source. With **autostart** on, Forth reads it after the
 kernel starts, at power-up, after RESET and after every restart, as if it were typed
@@ -368,7 +427,7 @@ until a key is pressed (section 6.9); one that loops for ever, or waits for `key
 Forth at every start. To get past it, **hold the USER button** while you press RESET or
 restart, or click **Restart clean**; then switch the autostart off or erase the source.
 
-### 2.8 The board view
+### 2.9 The board view
 
 Tick **Board** at the top right (the Lab panel skin ticks it for you). The view shows the
 board as Forth sees it, read several times a second:
@@ -390,7 +449,7 @@ board as Forth sees it, read several times a second:
 The view only reads: Forth's I/O is never changed by it. It is updated only while Forth
 answers (section 2.3).
 
-### 2.9 A worked session
+### 2.10 A worked session
 
 This session writes a small program, tries it, and makes it start with the board. The
 program is a running light on LED1 to LED8:
@@ -710,7 +769,7 @@ dictionary is reset and the saved source runs again, but the pins keep their sta
 
 ### 4.7 The saved source (autostart)
 
-One Forth source can be kept in the serial flash (from the app, section 2.7, or with
+One Forth source can be kept in the serial flash (from the app, section 2.8, or with
 `python tools/mforth.py -p COMx --store file.fs`). Its format:
 
 | Flash address | Content |
@@ -1416,7 +1475,7 @@ behind the request waits as well, so end the read before you read the keyboard.
 ### 5.18 Saved source
 
 These words work on the source kept in the flash (section 4.7). The app does the same with
-its saved-source box (section 2.7).
+its saved-source box (section 2.8).
 
 | Word | Stack | Description |
 |---|---|---|
@@ -2142,7 +2201,7 @@ number.
 | The board hangs at power-up, or misbehaves from the start | The saved source does it: hold the USER button while you press RESET, or *Restart clean* in the app (section 4.7). Then switch the autostart off or erase it. |
 | An error ends in `(in the saved source)` | A line of the saved source failed; the lines after it were not run. Fix the source and store it again. |
 | Forth stops responding | A word is in an endless loop or waiting for `key`. Press any key, or Ctrl-R (*Restart* in the app). |
-| Your words are gone | A restart or a power cycle brings back the original kernel. Keep useful definitions in a file and run it, save it as the board's source (section 2.7), or add them to `kernel.fs`. |
+| Your words are gone | A restart or a power cycle brings back the original kernel. Keep useful definitions in a file and run it, save it as the board's source (section 2.8), or add them to `kernel.fs`. |
 | Pasting a long text into a terminal program loses characters | Forth's receive buffer holds 8 KB. Paste in parts, or use the app's *Run all* or `mforth.py -f`, which wait for Forth. |
 | Numbers look wrong, or every number gives `?` | Check `base`: after `hex` or `2 base !`, input and output both use that base, and an error doesn't reset it. `decimal` switches back. |
 | A long line gives an error near its end | Only 80 characters fit on a line; the rest is dropped, possibly in the middle of a word. Split the line. |
