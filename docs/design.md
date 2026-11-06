@@ -7,8 +7,8 @@ someone who wants to understand, change or extend the design. How to *use* the F
 the [user manual](Manual.md); the serial protocol the app speaks is protocol 1 of
 [ZYNQ-FORTH](https://github.com/andiepp/ZYNQ-FORTH) (its `docs/Protocol.md`).
 
-All figures in this document are those of release 1.1 (firmware 1.1, protocol 1, kernel of
-323 words and 10,244 bytes), unless a section names release 1.0 for comparison. The PDF
+All figures in this document are those of release 1.2 (firmware 1.2, protocol 1, kernel of
+330 words and 10,514 bytes), unless a section names an earlier release for comparison. The PDF
 version, `docs/Implementation-Details.pdf`, is generated from this file by
 `python tools/manual_pdf.py design`.
 
@@ -131,7 +131,7 @@ And an app request, say `SOH stack LF` sent while Forth waits at the prompt:
 | `tools/hf16.py` | cross-compiler and instruction-set simulator (ISS) |
 | `tools/mforth.py` | line sender, source store, restart from the PC |
 | `tools/manual_pdf.py` | builds `docs/Manual.pdf` and `docs/Implementation-Details.pdf` |
-| `sim/run_flash_tests.ps1`, `sim/test_protocol.py` | simulator tests: saved source (23 checks), service protocol (41 checks) |
+| `sim/run_flash_tests.ps1`, `sim/test_protocol.py` | simulator tests: saved source (23 checks), service protocol (53 checks) |
 | `examples/bench.fs` | the bench demo of the manual |
 | `docs/` | user manual, this document, images |
 
@@ -193,8 +193,9 @@ slow).
 
 ### 2.2 Resources used
 
-From the fitter report of the 1.1 release build (`build/output_files/max1000_forth.fit.rpt`,
-Quartus Prime Lite 18.1):
+From the fitter report of the 1.2 release build (`build/output_files/max1000_forth.fit.rpt`,
+Quartus Prime Lite 18.1). Release 1.2 changed only the kernel, which is the RAM's initial
+content, so the figures are those of 1.1:
 
 | Resource | Used | Available | % |
 |---|---|---|---|
@@ -231,7 +232,7 @@ stages of 32 × 16 products each. The CPU itself is 869 logic elements.
 
 ### 2.3 Timing
 
-From the timing analyzer of the 1.1 build (`max1000_forth.sta.summary`), slow model, 1200 mV,
+From the timing analyzer of the 1.2 build (`max1000_forth.sta.summary`), slow model, 1200 mV,
 85 °C (the worst corner):
 
 | Clock | Setup slack | Hold slack | Fmax |
@@ -470,7 +471,7 @@ reliably:
 Code and data share the RAM: the Forth compiler, running on HF16, writes new code with
 ordinary stores, and the code port fetches it in the next instruction. **The 16 KB code
 limit** follows from the 13-bit word addresses in jumps, calls and the PC: a colon
-definition must lie below 0x4000. The kernel takes 10,244 bytes of it, leaving 6,140 bytes
+definition must lie below 0x4000. The kernel takes 10,514 bytes of it, leaving 5,870 bytes
 for typed definitions. The 8 KB above it (0x4000–0x5FFF) can be read and written but not
 executed; the kernel hands out 0x4000–0x5BFF as **data RAM** with `buffer:` and keeps its
 own buffers in 0x5C00–0x5FFF (section 5.2). Nothing checks that the dictionary stays below
@@ -769,8 +770,8 @@ WHO_AM_I (`$0F`) answers `$33` (`accel?`). The board lying flat reads z ≈ +102
 
 ## 5 The Forth kernel
 
-The kernel is one Forth source file, `forth/kernel.fs` (766 lines). It compiles to a
-10,244-byte image (5,122 cells) with 323 words, and everything a user meets is in it: the
+The kernel is one Forth source file, `forth/kernel.fs` (786 lines). It compiles to a
+10,514-byte image (5,257 cells) with 330 words, and everything a user meets is in it: the
 interpreter, the compiler, number conversion, the board words, the saved source and the
 answers to the app. About a third of the words are internal.
 
@@ -807,9 +808,9 @@ for the request names); the target compiler has no `s"`.
 | Address | Content |
 |---|---|
 | `$0000` | jump to `cold` (the reset vector) |
-| `$0002`–`$2803` | the kernel: headers, code and variables, 10,244 bytes with the vector |
-| `$2804` | HERE after a cold start: new definitions grow upward |
-| `$3FFF` | the end of the code space: 6,140 bytes free (`unused`) |
+| `$0002`–`$2911` | the kernel: headers, code and variables, 10,514 bytes with the vector |
+| `$2912` | HERE after a cold start: new definitions grow upward |
+| `$3FFF` | the end of the code space: 5,870 bytes free (`unused`) |
 | `$4000`–`$5BFF` | data RAM handed out by `buffer:` (`dp2`, 7,168 bytes, `unused-data`) |
 | `$5C00`–`$5FFF` | the kernel's buffers, below |
 | `$6000`–`$7FFF` | no RAM |
@@ -852,7 +853,7 @@ to 31 characters.
 | Primitives | 378 | 35 | `dup + @ ! …` as `:inline` words of one instruction each; `exit`, `execute` |
 | Stack and arithmetic | 708 | 32 | `rot`, `min`, `umin`, `abs`, `u/mod /mod / mod`, `um* um/mod */`, `within`, the `do` runtime |
 | Variables | 406 | 28 | `dp latest dp0 latest0 kcheck starts state base >in #tib`, `tib`, `here allot , c,`, `hex decimal` |
-| Board I/O | 302 | 11 | `key? key emit`, `led! led@ btn@ ms@ ms` |
+| Board I/O | 426 | 15 | `key? key emit`, `led! led@ led-on led-off led-toggle btn@ ms@ ms` |
 | Digital pins | 248 | 10 | `pin output input high low toggle pin@ pin!` |
 | PWM | 334 | 8 | `pwm-hz pwm-khz pwm-duty pwm-pin pwm-off`, `ud/u` |
 | DDS | 238 | 8 | `dds-hz dds-khz dds-tuning dds-pin dds-off`, `(dds-hz)` |
@@ -860,7 +861,7 @@ to 31 characters.
 | Accelerometer | 196 | 8 | `acc@ acc! accel? accel-on accel@` |
 | Serial flash | 348 | 15 | `spi f-read f-prog f-erase f-erase64 flash-id crc-reset crc+ crc@` |
 | Saved source | 1,572 | 37 | `store autostart erase-source .source source? load-source`, `autoload`, `fkey lfill` |
-| Service requests | 2,720 | 47 | `service? serve dispatch answer`, the payload words `p-…`, `rq-store rq-restart` |
+| Service requests | 2,866 | 50 | `service? serve dispatch answer`, the payload words `p-…`, `rq-store dec16 rq-restart` |
 | Output | 440 | 17 | `cr space type (.") . u. .s ?`, `unused unused-data buffer:` |
 | Parsing | 208 | 4 | `parse-name parse` |
 | Dictionary search | 266 | 6 | `find-name name>xt same?` |
@@ -868,8 +869,9 @@ to 31 characters.
 | Compiler | 730 | 36 | `header : ; literal create variable constant if then do loop ( \ ."` |
 | Interpreter | 756 | 11 | `words abort ?stack interpret-word interpret accept-line snap quit cold` |
 
-Together with the 2-byte reset vector that is the 10,244 bytes. A quarter of the kernel is the
-service protocol, which on the Zynq is the ARM's job; with the saved source it is 42 %.
+Together with the 2-byte reset vector that is the 10,514 bytes. More than a quarter of the
+kernel is the service protocol, which on the Zynq is the ARM's job; with the saved source it is
+42 %.
 
 ### 5.5 Primitives, inlining and execute
 
@@ -1144,6 +1146,20 @@ Every board word is a few accesses to the I/O registers:
 `output`, `input`, `high`, `low`, `toggle` read-modify-write the direction or latch register
 next to it. Further words:
 
+- **LEDs** (release 1.2): `led-mask` does for an LED number what `pin` does for a pin, and the
+  three single-LED words read-modify-write the LED register through `led@` and `led!`:
+
+  ```forth
+  : led-mask ( n -- mask )                \ LED n (1..8) as its bit in LED!
+    dup 1 9 within 0= if ."  bad led" cr abort then 1- 1 swap lshift ;
+  : led-on ( n -- ) led-mask led@ or led! ;
+  : led-off ( n -- ) led-mask invert led@ and led! ;
+  : led-toggle ( n -- ) led-mask led@ xor led! ;
+  ```
+
+  HF16 has no interrupts and the service answers only read the LEDs, so nothing can change
+  the register between the read and the write.
+
 - **PWM:** `pwm ( ch -- a )` checks the channel and gives its register address;
   `pwm-hz ( hz ch -- )` writes the period 48,000,000 / hz (`ud/u`), `pwm-khz` 48,000 / khz
   (1..24,000 kHz), `pwm-duty ( permille ch -- )` the duty permille × 65,535 / 1000,
@@ -1249,7 +1265,10 @@ one CPU, between two bytes of Forth's own input and output.
 : soh? ( -- f ) rx? if $800C @ 1 = else 0 then ;
 : key? ( -- f )
   serving @ if rx? exit then
-  begin service? rx? while $800C @ 1 <> if -1 exit then repeat 0 ;
+  begin service? rx? while
+    $800C @ 1 <> if -1 exit then
+    $8022 @ 5 and if 0 exit then
+  repeat 0 ;
 : service? ( -- )
   serving @ if exit then
   $8022 @ 5 and if exit then        \ a word is talking to the flash or the accelerometer
@@ -1272,10 +1291,14 @@ showed that race (section 6.6).
 the raw test and `service?` returns at once). And nothing is answered while a word has the
 flash or the accelerometer selected (`$8022` bits 0 or 2): the `board` answer reads the
 accelerometer and `source` reads the flash, which would break a transfer that word has open.
-Such requests wait until the word deselects. A consequence to know: a program that calls
-`key?` while it keeps the flash or the accelerometer selected waits in `key?` for good if a
-request arrives meanwhile, because the SOH can neither be served nor passed; only Ctrl-R gets
-out. The kernel's own words never do that.
+Such requests wait until the word deselects. A SOH at the head of the FIFO then can neither
+be served nor passed as terminal input, so `key?` answers false in that case (the second test
+in its loop). Up to release 1.1 it looped instead: a program that polled `key?` while it kept
+the flash or the accelerometer selected hung there as soon as a request arrived, and only
+Ctrl-R got out. Now such a program goes on; terminal input queued behind the request is seen
+once the word deselects. `key` in the same situation still waits, for the request and the
+input behind it, until the device is released. The kernel's own words never wait for input
+with a device selected.
 
 **Serving.** `serve` pops the SOH, sets `serving`, and reads the request with `rq-line`: bytes
 up to LF into `rq` (at most 63 kept), each within 2 s, so an unfinished request is dropped and
@@ -1299,20 +1322,22 @@ The payload words must produce the same bytes both times. They print hexadecimal
 a fixed width (`hex4`, `hex8`), so live readings such as the ADC codes may change between the
 passes without changing the length. The decimal numbers of the `status` answer have variable
 width; of those only `input` can change between the passes (when bytes arrive during the
-roughly 90 µs of a pass), which would make the announced length wrong by a digit. `source`
+roughly 90 µs of a pass), which made the announced length wrong by a digit up to release 1.1.
+Since 1.2 `dispatch` takes the count once, into `s-in`, before `answer` runs, and both passes
+print that. `source`
 uses the stored length directly and generates its payload once (`answer-n`). Inside an answer
 `emit` does not double 0x01, since the reader counts bytes.
 
 | Request | Answer payload |
 |---|---|
 | `echo <word>` | the word |
-| `version` | `firmware max1000-forth 1.1`, `protocol 1`, `kernel <cells> <kcheck>` (5122 and the image's cell sum in hex, set by the cross-compiler) |
+| `version` | `firmware max1000-forth 1.2`, `protocol 1`, `kernel <cells> <kcheck>` (5257 and the image's cell sum in hex, `9CB4`, set by the cross-compiler) |
 | `status` | `state running`, `pc 0000` (always: the PC is not readable), `input` = RX FIFO bytes (`$800E`) plus the unread rest of a saved source, `starts`, `source` (`none`, `stored` or `damaged`), `length`, `crc`, `autostart` (`on` or `off`), `last` (`none`, `fed` or `skipped`) |
 | `words` | `here <hex>`, then one line per word, newest first: execution token, flags (`-` or `i` immediate, `h` hidden, `n` inline), name |
 | `stack` | the snapshot of the last prompt: depth, then the cells bottom first in hex; `err stack busy` while `snap` copies |
 | `board` | the board lines below |
 | `source` | the saved text (`err source none` or `damaged`) |
-| `store <len> <crc> on` (or `off`) | erases the header, receives `len` bytes like `store`, checks the CRC; `err store args`, `timeout`, `crc` or `flash` |
+| `store <len> <crc> on` (or `off`) | erases the header, receives `len` bytes like `store`, checks the CRC; `err store args` (also for a length that is not decimal digits or above 65535, checked by `dec16`; up to 1.1 such a length wrapped), `timeout`, `crc` or `flash` |
 | `erase` | erases the header sector |
 | `autostart on` (or `off`) | rewrites the header's flag; `err autostart none` without a source |
 | `restart [skip]` | answers, waits until the TX FIFO and transmitter are idle (`$8002` bit 2), sets `skip1` for `skip`, and stores to `$8008` |
@@ -1378,10 +1403,10 @@ second, which is how the kernel is developed. It models:
 | W25Q64 | JEDEC ID, status, write enable, read, page program (within the page), 4 KB and 64 KB erase; `--flash image` keeps the first 128 KB in a file between runs |
 | CRC | zlib's `crc32`, as the hardware |
 | SPI | an exchange completes at once (never busy) |
-| Restart | a store to `$8008` resets CPU, LEDs, pins, PWM, DDS and SPI selects; the RAM stays |
+| Restart | a store to `$8008` resets CPU, LEDs, pins, PWM, DDS and SPI selects and clears the RX FIFO (since 1.2, as the hardware); the RAM stays |
 
 It does not model the store hazard's undefined read (the compilers never use it), the
-Ctrl-R byte, the clearing of the RX FIFO by a restart, or any timing below an instruction. A
+Ctrl-R byte, or any timing below an instruction. A
 run ends when all input is consumed and Forth has polled the empty FIFO 2,000 times, or after
 `--steps` instructions.
 
@@ -1406,16 +1431,20 @@ and run; `erase-source`.
 
 ### 6.4 `sim/test_protocol.py`
 
-41 checks of the service requests, driving the simulator byte by byte and splitting its
-output into terminal text and answers as the app does: the banner; `echo`; `version` (with
-the checksum recomputed from the image); `status`; `stack` and the empty stack; `words` (all
-323 words, flags, a new word first); `board` at the start, with pins, PWM and LEDs, with the
-temperature and the accelerometer, with the DDS on pin 9 at 1 MHz; DDS tuning words at 1 Hz
-and 65,535 kHz against Python; the data RAM and its end, `buffer:` and its alignment; no
-answer while the flash is selected; `store` (also with a wrong CRC), `source`, `restart` and
-`restart skip` with their effect on `status`; `autostart` on, off and with bad arguments;
-`erase`; an unknown request; an answer during `ms` that comes before the line's ` ok`; a SOH
-printed by Forth arriving doubled; an unfinished request dropped after 2 s; a 15 KB store.
+53 checks of the service requests and the board words around them, driving the simulator
+byte by byte and splitting its output into terminal text and answers as the app does: the
+banner; `echo`; `version` (with the checksum recomputed from the image); `status`; `stack` and
+the empty stack; `words` (all 330 words, flags, a new word first); `board` at the start, with
+pins, PWM and LEDs, with the temperature and the accelerometer, with the DDS on pin 9 at
+1 MHz; DDS tuning words at 1 Hz and 65,535 kHz against Python; the data RAM and its end,
+`buffer:` and its alignment; no answer while the flash is selected, and `key?` false
+meanwhile instead of looping; `led-on`, `led-off`, `led-toggle`, ` bad led`, the other LEDs
+kept; the `input` count of `status`; `store` lengths 65536, 70000, 99999, `1x`, `-5` and
+`$100` refused; `store` (also with a wrong CRC), `source`, `restart` (also clearing the input
+queued behind it) and `restart skip` with their effect on `status`; `autostart` on, off and
+with bad arguments; `erase`; an unknown request; an answer during `ms` that comes before the
+line's ` ok`; a SOH printed by Forth arriving doubled; an unfinished request dropped after
+2 s; a 15 KB store.
 
 `scripts/Build-Release.ps1` runs both test scripts before every release build.
 
@@ -1432,6 +1461,10 @@ printed by Forth arriving doubled; an unfinished request dropped after 2 s; a 15
   gave 200 edges, 1 kHz 2001, 10 kHz 20,010 and 20,015.
 - **App protocol:** with ZYNQ-FORTH's `tools/zforth.py` and with the app itself, including
   the live board view while a program runs.
+- **Release 1.2:** the single-LED words on the board's LEDs (133, then 130, ` bad led` for 0
+  and 9); a word polling `key?` with the flash selected while a `board` request arrived
+  counted to its end (`kq 50`), and the answer followed at `f-end`; `store` lengths 65536,
+  99999 and `1x` refused.
 
 ### 6.6 Found on the way
 
@@ -1447,6 +1480,9 @@ The simulator and the board found these, and each is now covered by a check or a
 | inputs read the wrong channel, open inputs copied others | one conversion did not settle after another channel; the header labels are not in channel order | four conversions per channel, the last kept; the `ain` table |
 | 48 MHz missed timing by 0.66 ns | the I/O read multiplexer was behind the next-T path | the multiplexer works from the registered `io_addr` |
 | the ADC core did not take the channel mask | `analog_input_pin_mask` was given as a sized vector | an integer, 65,791 |
+| `key?` could hang (found while writing this document) | a request at the head of the FIFO while a word kept a device selected was neither served nor passed | `key?` answers false then (1.2) |
+| the `status` length could be off by one (same) | `input` was read in each of the two passes | read once into `s-in` (1.2) |
+| a `store` length above 65535 wrapped (same) | `number?` keeps 16 bits | `dec16` refuses it (1.2) |
 
 ## 7 Building, flashing and releasing
 
@@ -1513,22 +1549,25 @@ repository). The serial flash with the saved source is not touched by either.
 
 ### 7.5 Releases
 
-`scripts/Build-Release.ps1 -Version 1.1` runs the two simulator test scripts, builds the
-kernel and the configuration, builds `docs/Manual.pdf` with `tools/manual_pdf.py` (Python
-`markdown` and Microsoft Edge; `-SkipPdf` uses the committed PDF) and writes
-`dist/MAX1000-FORTH-<version>.zip` with:
+`scripts/Build-Release.ps1 -Version 1.2` runs the two simulator test scripts, builds the
+kernel and the configuration, rewrites the manual's contents list from its headings
+(`tools/manual_contents.py`), builds `docs/Manual.pdf` and `docs/Implementation-Details.pdf`
+with `tools/manual_pdf.py` (Python `markdown` and Microsoft Edge; `-SkipPdf` uses the
+committed PDFs) and writes `dist/MAX1000-FORTH-<version>.zip` with:
 
 | Folder | Content |
 |---|---|
 | `firmware/` | `max1000_forth.pof`, `max1000_forth.sof`, `program_flash.ps1` |
-| `docs/` | `Manual.pdf`, `design.md`, `images/` |
+| `docs/` | `Manual.pdf`, `Implementation-Details.pdf`, `design.md`, `images/` |
 | `tools/` | `mforth.py`, `hf16.py` |
 | `examples/` | `bench.fs` |
 | top | `README.md`, `CHANGELOG.md`, `LICENSE` |
 
 Release **1.0** (2026-11-05) was the first: CPU, kernel, terminal, board words, saved
 source, app support. Release **1.1** (2026-11-06) added the DDS and the `dds` line of the
-`board` answer. Both are published at
+`board` answer. Release **1.2** (2026-11-06) added the single-LED words and fixed the three
+kernel findings of section 6.6; its zip is the first with this document as a PDF and with
+the manual's detailed contents. All are published at
 [github.com/andiepp/MAX1000-FORTH](https://github.com/andiepp/MAX1000-FORTH).
 
 ## 8 The Windows app
@@ -1577,7 +1616,7 @@ waits, Ctrl-R always.
 
 ### 9.2 Room for growth
 
-The 1.1 design leaves, of the 10M08:
+The 1.2 design leaves, of the 10M08:
 
 - **Logic:** 3,805 logic elements free (47 %). The four PWM channels alone use 1,734; a fifth
   peripheral of the DDS's size (150 logic elements) fits many times over.
@@ -1586,7 +1625,7 @@ The 1.1 design leaves, of the 10M08:
 - **Multipliers:** 30 of 48 9-bit elements free.
 - **PLL:** 2 of 5 outputs free, for another clock domain.
 - **UFM:** the user flash block inside the MAX 10 is unused.
-- **Code space:** 6,140 bytes for typed words; the missing Forth words (section 5.14) would fit
+- **Code space:** 5,870 bytes for typed words; the missing Forth words (section 5.14) would fit
   in the kernel at some tens to hundreds of bytes each.
 - **Data RAM:** 7,168 bytes for `buffer:`, plus 224 unused bytes among the kernel's buffers.
 - **Pins:** the header's analog pins are taken by the ADC; all 23 digital pins and the Pmod

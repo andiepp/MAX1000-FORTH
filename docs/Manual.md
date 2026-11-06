@@ -15,7 +15,7 @@ the temperature diode of the MAX 10's built-in converter, the board's LIS3DH
 at every start.
 
 This manual covers how to use the system, how the implementation works, and every word in
-the kernel. It describes MAX1000-FORTH 1.1. For the hardware details (I/O map, pins, ADC
+the kernel. It describes MAX1000-FORTH 1.2. For the hardware details (I/O map, pins, ADC
 channels, service requests), see [design.md](design.md).
 
 Contents:
@@ -455,6 +455,7 @@ and leaves `c`.
 | `name ?` | word not found and not a number | data stack cleared, back to interpreting |
 | ` stack underflow` | a word took more items than were on the stack | data stack cleared |
 | ` stack overflow` | more than 20 items on the data stack | data stack cleared |
+| ` bad led` | `led-on`, `led-off`, `led-toggle` or `led-mask` got a number outside 1..8 (section 5.10) | data stack cleared |
 | ` bad pin` | a pin word got a number that is not a pin (section 5.11) | data stack cleared |
 | ` bad input` | `adc@` or `mv@` got an input above 8 (section 5.12) | data stack cleared |
 | ` bad channel` | a PWM word got a channel above 3 (section 5.13) | data stack cleared |
@@ -541,8 +542,8 @@ The instruction encoding is described in ZYNQ-FORTH's `docs/design.md`; it is th
 | Address | Content |
 |---|---|
 | `$0000` | jump to `cold` (start-up) |
-| `$0002`–`$2803` | the kernel: 323 words with their headers and variables |
-| `$2804`–`$3FFF` | free for your definitions (6,140 bytes). `here` shows the next free byte, `unused` how much is left |
+| `$0002`–`$2911` | the kernel: 330 words with their headers and variables |
+| `$2912`–`$3FFF` | free for your definitions (5,870 bytes). `here` shows the next free byte, `unused` how much is left |
 | `$4000`–`$5BFF` | data RAM for `buffer:` (7,168 bytes); `unused-data` shows how much is left |
 | `$5C00`–`$5FFF` | the kernel's buffers (below; `$5E20`–`$5EFF` is not used) |
 | `$6000`–`$7FFF` | no RAM; stores there are ignored |
@@ -712,7 +713,7 @@ twice, so the app can tell it from the start of an answer; a terminal program sh
 
 | Request | Answer |
 |---|---|
-| `version` | `firmware max1000-forth 1.1`, `protocol 1`, `kernel <cells> <checksum>` |
+| `version` | `firmware max1000-forth 1.2`, `protocol 1`, `kernel <cells> <checksum>` |
 | `status` | state, receive FIFO bytes, starts, the saved source's state, length, CRC, autostart, and whether it ran at the last start |
 | `stack`, `words` | the data stack at the last prompt; the dictionary |
 | `board` | LEDs and button, both pin ports with their directions and PWM/DDS owners, PWM channels, the 9 ADC codes, the temperature code, the accelerometer and the DDS (control and tuning) |
@@ -725,7 +726,7 @@ The details are in [design.md](design.md). There is no HASE mode on the MAX1000.
 
 ## 5. Word reference
 
-The kernel has 323 words. About a third of them are internal: they serve the interpreter,
+The kernel has 330 words. About a third of them are internal: they serve the interpreter,
 the compiler, the saved source and the app's requests (sections 5.23 and 5.24). Where a
 word differs from standard Forth, its entry says so.
 
@@ -867,7 +868,7 @@ New definitions and data are added at `here`, the next free byte of the code spa
 | `buffer: name` | `( n "name" -- )` | Reserve n bytes of data RAM (rounded up to even, so cells stay aligned); `name` then pushes their address. ` data RAM full` if fewer than n bytes are left. |
 | `unused-data` | `( -- n )` | Free data RAM in bytes. |
 
-A fresh kernel leaves 6,140 bytes of code space and 7,168 bytes of data RAM. `buffer:`
+A fresh kernel leaves 5,870 bytes of code space and 7,168 bytes of data RAM. `buffer:`
 rounds odd sizes up, so every buffer starts at an even address. The data RAM is not cleared, and a restart frees all of it, together with the
 words that named the buffers.
 
@@ -920,15 +921,26 @@ An error doesn't reset `base`; type `decimal` to get back.
 |---|---|---|
 | `led!` | `( n -- )` | Set LED1..LED8 from bits 0..7 of n (1 = on; bit 0 = LED1). |
 | `led@` | `( -- n )` | Read back the LED state. |
+| `led-on` | `( n -- )` | Switch LED n (1..8) on; the other LEDs stay as they are. |
+| `led-off` | `( n -- )` | Switch LED n (1..8) off; the other LEDs stay as they are. |
+| `led-toggle` | `( n -- )` | Change LED n (1..8): on becomes off, off becomes on. |
+| `led-mask` | `( n -- mask )` | The bit of LED n in `led!` (1 for LED1 … 128 for LED8); ` bad led` for n outside 1..8. |
 | `btn@` | `( -- f )` | The USER button: true while pressed. Debounced (sampled every 10 ms). |
 | `ms` | `( n -- )` | Wait n milliseconds (0..32767). Answers the app's requests while it waits. |
 | `ms@` | `( -- n )` | Millisecond counter; wraps every 65.536 s. |
 
-`ms` waits at least n ms and less than n + 1. `btn@` reads "not pressed" for the first
-10 ms after a restart. The RESET button cannot be read (section 1).
+`led!` sets all eight LEDs at once; `led-on`, `led-off` and `led-toggle` change one LED and
+leave the others alone (they read the state with `led@`, change one bit and write it back).
+The LED numbers are those printed on the board, LED1..LED8. `ms` waits at least n ms and
+less than n + 1. `btn@` reads "not pressed" for the first 10 ms after a restart. The RESET
+button cannot be read (section 1).
 
 ```
-$81 led!          \ LED1 and LED8 on
+$81 led!          \ LED1 and LED8 on, all others off
+3 led-on          \ LED3 on as well: LED1, LED3 and LED8 are lit
+1 led-off         \ LED1 off: LED3 and LED8 stay on
+led@ .            \ prints 132 ($84)
+: blink3 10 0 do 3 led-toggle 200 ms loop ;
 btn@ .            \ hold the USER button while pressing Enter: prints -1
 ```
 
@@ -1222,6 +1234,8 @@ deselects the other. While a read started by `f-read` is open (until `f-end`), c
 accelerometer word (`accel@`, `acc@`, …) and no other flash word, or the read ends. The
 app cannot get in the way: while the flash or the accelerometer is selected, the kernel
 answers no request (they wait until `f-end`), so you may print or wait inside an open read.
+`key?` answers false while such a request waits at the head of the input, and terminal input
+behind the request waits as well, so end the read before you read the keyboard.
 
 ### 5.17 Saved source
 
@@ -1474,11 +1488,12 @@ the next start skip the saved source (the `restart skip` request).
 the receive FIFO; `serve ( -- )` reads one (`rq-line ( -- f )`) and `dispatch ( -- )` picks
 the answer. The others build answers and exist for the app's protocol only: `answer`,
 `answer-n`, `refuse`, `rq-word`, `rq-c`, `rq=`, `=s`, `hexnum`, `hexd`, `hex4`, `hex8`,
-`lf`, `noop`, `on/off`, the request words `rq-restart`, `rq-source`, `rq-store`,
+`lf`, `noop`, `on/off`, `dec16` (the length of `store`: decimal, at most 65535), the request words `rq-restart`, `rq-source`, `rq-store`,
 `rq-autostart`, the payload words `p-echo`, `p-version`, `p-status`, `p-words`, `p-stack`,
 `p-board`, `p-source`, the helpers `pwm-ctl`, `pwm-own`, `dds-own`, `port-word`, `pwm-word`,
 `tx-idle`, and the variables and buffers `serving`, `counting`, `acount`, `rq`, `rq#`,
-`rq>`, `rqn-a`, `rqn-n`, `ea`, `en`, `rlen`, `rclo`, `rchi`, `rflag`, `pp`.
+`rq>`, `rqn-a`, `rqn-n`, `ea`, `en`, `rlen`, `rclo`, `rchi`, `rflag`, `pp`, `s-in` (the
+`input` count of a `status` answer, taken once), `dacc`.
 
 ---
 
@@ -1502,6 +1517,14 @@ count256
 ```forth
 : runner begin 8 0 do 1 i lshift led! 100 ms loop key? until key drop 0 led! ;
 runner
+```
+
+**Two LEDs blinking in turn** (one LED at a time with `led-on` and `led-toggle`)
+```forth
+: alternate ( -- )   \ LED1 and LED2 take turns; any key stops
+  0 led! 1 led-on
+  begin 1 led-toggle 2 led-toggle 250 ms key? until key drop 0 led! ;
+alternate
 ```
 
 **The button lights all LEDs**

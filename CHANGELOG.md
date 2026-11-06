@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.2 — 2026-11-06
+
+- **Single LEDs:** `led-on`, `led-off` and `led-toggle ( n -- )` switch LED n (1..8) and
+  leave the others as they are; `led-mask ( n -- mask )` gives its bit; ` bad led` for other
+  numbers.
+- `key?` no longer waits for good when an app request arrives while a word keeps the flash or
+  the accelerometer selected: it answers false, and the request waits until the device is
+  released.
+- The `input` count of the `status` answer is taken once, so a byte arriving during the
+  answer can no longer make the announced length wrong.
+- `store` requests take a decimal length of at most 65535; a bigger one is refused (`err store
+  args`) instead of wrapping around.
+- The simulator clears the RX FIFO on a restart, as the hardware does.
+- **Docs:** the manual's contents list every section as a link (chapters and their
+  sub-chapters), and has the DDS section (5.14) and the LED words; the release contains
+  `docs/Implementation-Details.pdf`, a detailed description of the implementation (CPU,
+  memory and I/O, peripherals, kernel, service protocol, tools, design decisions).
+
 ## 1.1 — 2026-11-06
 
 - **DDS square wave** on any pin (after ZYNQ-FPGA-FORTH32): a 32-bit phase accumulator on

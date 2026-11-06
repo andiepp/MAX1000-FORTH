@@ -739,8 +739,10 @@ class Machine:
             self.dsp, self.rsp, self.t = new_dsp, new_rsp, v
 
     def restart(self):
-        """What a CPU reset does (Ctrl-R or a store to 0x8008); the RAM keeps its contents."""
+        """What a CPU reset does (Ctrl-R or a store to 0x8008); the RAM keeps its contents,
+        the RX FIFO is cleared as in the RTL."""
         self.pc = self.t = self.dsp = self.rsp = 0
+        del self.rx[:]
         self.leds = self.pin_out = self.pin_dir = 0
         self.pwm = [[0, 0, 0, 0] for _ in range(4)]
         self.dds = [0, 0, 0]

@@ -97,7 +97,7 @@ image = b.comp.mem
 kc = b.comp.lookup('kcheck')['xt'] + 4
 total = (sum(image[a] | image[a + 1] << 8 for a in range(0, b.comp.dp, 2))
          - (image[kc] | image[kc + 1] << 8)) & 0xFFFF
-check('version', head[:2] == ['ok', 'version'] and v['firmware'] == ['max1000-forth', '1.1']
+check('version', head[:2] == ['ok', 'version'] and v['firmware'] == ['max1000-forth', '1.2']
       and v['protocol'] == ['1'] and v['kernel'][0] == str(b.comp.dp // 2)
       and int(v['kernel'][1], 16) == total, pl)
 
@@ -151,6 +151,35 @@ pos = dict(e for e in events if e[0] == 'term-pos')
 check('no answer while the flash is selected', len(answers) == 1 and
       term[:pos.get('term-pos', 0)].strip().startswith('rd 255'), (term, events))
 
+# ... and KEY? answers false meanwhile instead of looping (it used to hang there)
+b.m.rx += b': kq 0 0 f-read 0 begin 1+ key? over 50 = or until f-end . ;\r'
+b.run()
+b.output()
+b.m.rx += b'kq\r' + bytes([SOH]) + b'board\n'
+b.run()
+term, answers, events = b.output()
+pos = dict(e for e in events if e[0] == 'term-pos')
+check('KEY? false while a request waits for the flash', len(answers) == 1 and
+      term[:pos.get('term-pos', 0)].strip().startswith('kq 50'), (term, events))
+
+# single LEDs: LED1..LED8 = bits 0..7 of LED!
+term = b.type('0 led! 1 led-on 8 led-on 3 led-on led@ .')
+term += b.type('1 led-off 3 led-toggle 2 led-toggle led@ .')
+check('led-on led-off led-toggle', 'led@ . 133' in term and 'led@ . 130' in term, term)
+check('bad led', 'bad led' in b.type('0 led-on') and 'bad led' in b.type('9 led-off'))
+check('led words keep the others', '130' in b.type('led@ .'))
+
+# status: input counts the terminal bytes behind the request
+b.m.rx += bytes([SOH]) + b'status\n' + b'7 .\r'
+b.run()
+term, answers, _ = b.output()
+st = lines(one(answers)[1])
+check('status input', st['input'] == ['4'] and '7 . 7' in term, (st, term))
+
+# store lengths: decimal 1..65535 only (a bigger one used to wrap)
+for arg in ('65536', '70000', '99999', '1x', '-5', '$100'):
+    check(f'store {arg} refused', one(b.request(f'store {arg} 00000000 on')[1])[0] == ['err', 'store', 'args'])
+
 b.type('3 output 3 high 1000 0 pwm-hz 500 0 pwm-duty 5 0 pwm-pin $a5 led!')
 head, pl = one(b.request('board')[1])
 bd = lines(pl)
@@ -195,9 +224,15 @@ check('after restart: source ran', st['starts'] == ['2'] and st['last'] == ['fed
 check('word from the saved source', '42' in b.type('hi .'))
 check('dictionary fresh after restart', 'sq ?' in b.type('sq'))
 
+# a restart clears the RX FIFO: what was queued behind the request is gone
+b.m.rx += bytes([SOH]) + b'restart\n' + b'nosuchword\r'
+b.run()
+term, answers, _ = b.output()
+check('restart clears the input', one(answers)[0] == ['ok', 'restart', '0'] and 'nosuchword' not in term, (answers, term))
+
 term, answers, _ = b.request('restart skip')
 st = lines(one(b.request('status')[1])[1])
-check('restart skip', st['starts'] == ['3'] and st['last'] == ['skipped'], st)
+check('restart skip', st['starts'] == ['4'] and st['last'] == ['skipped'], st)
 check('skipped source not run', 'hi ?' in b.type('hi'))
 
 check('autostart off', one(b.request('autostart off')[1])[0] == ['ok', 'autostart', '0'])

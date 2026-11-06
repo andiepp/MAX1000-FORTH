@@ -59,7 +59,7 @@ kernel, the service protocol, the tools and the design decisions.
 
 | Area | Words |
 |---|---|
-| LEDs, button, time | `led!` `led@` `btn@` `ms@` `ms` |
+| LEDs (1..8), button, time | `led!` `led@` `led-on` `led-off` `led-toggle` `btn@` `ms@` `ms` |
 | Digital pins (0..14 = D0..D14, 16..23 = PIO1..PIO8) | `output` `input` `high` `low` `toggle` `pin!` `pin@` |
 | PWM | `pwm-hz` `pwm-khz` `pwm-duty` `pwm-pin` `pwm-off` |
 | DDS square wave (0.045 Hz steps) | `dds-hz` `dds-khz` `dds-tuning` `dds-pin` `dds-off` |
@@ -89,7 +89,7 @@ scripts\program_flash.ps1 [-Sram]      # write it to the board
 sim\run_flash_tests.ps1                # simulator tests: flash and saved source
 python sim\test_protocol.py            # simulator tests: the app's service requests
 python tools\hf16.py run forth\kernel.fs -i "2 3 + ."      # the kernel in the simulator
-scripts\Build-Release.ps1 -Version 1.0                      # release zip in dist\
+scripts\Build-Release.ps1 -Version 1.2                      # release zip in dist\
 ```
 
 `build.ps1` finds Quartus via `-Quartus`, `QUARTUS_ROOTDIR` or `<drive>:\Quartus\18.1\quartus`.

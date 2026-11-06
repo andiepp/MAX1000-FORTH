@@ -13,11 +13,11 @@
        CHANGELOG, LICENSE.
 
 .EXAMPLE
-    .\scripts\Build-Release.ps1 -Version 1.0
+    .\scripts\Build-Release.ps1 -Version 1.2
 #>
 [CmdletBinding()]
 param(
-    [string]$Version = '1.1',
+    [string]$Version = '1.2',
     [switch]$SkipTests,
     [switch]$SkipPdf
 )

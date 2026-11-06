@@ -149,10 +149,15 @@ variable dp2             \ next free byte of the data RAM (COLD resets it)
 : rx? ( -- f ) $8002 @ 1 and 0<> ;            \ a byte is waiting (raw)
 : soh? ( -- f ) rx? if $800C @ 1 = else 0 then ;
 \ true when a terminal byte is next; a request at the head of the FIFO is served
-\ first (deciding on the head byte itself leaves no window for a SOH to slip by)
+\ first (deciding on the head byte itself leaves no window for a SOH to slip by).
+\ While a word keeps the flash or the accelerometer selected a request cannot be
+\ served: it waits at the head, and KEY? answers false instead of looping.
 : key? ( -- f )
   serving @ if rx? exit then
-  begin service? rx? while $800C @ 1 <> if -1 exit then repeat 0 ;
+  begin service? rx? while
+    $800C @ 1 <> if -1 exit then
+    $8022 @ 5 and if 0 exit then
+  repeat 0 ;
 \ KEY reads the terminal, or the saved source while LOAD-SOURCE feeds it
 : key ( -- c )
   fcr @ if 0 fcr ! 13 exit then
@@ -165,6 +170,11 @@ variable dp2             \ next free byte of the data RAM (COLD resets it)
   dup 1 = serving @ 0= and if dup tx then tx ;
 : led! ( n -- ) $8004 ! ;              \ 8 user LEDs, bit 0 = LED1
 : led@ ( -- n ) $8004 @ ;
+: led-mask ( n -- mask )                \ LED n (1..8) as its bit in LED!
+  dup 1 9 within 0= if ."  bad led" cr abort then 1- 1 swap lshift ;
+: led-on ( n -- ) led-mask led@ or led! ;
+: led-off ( n -- ) led-mask invert led@ and led! ;
+: led-toggle ( n -- ) led-mask led@ xor led! ;
 : btn@ ( -- f ) $8006 @ 1 and 0<> ;    \ user button, true while pressed
 : ms@ ( -- n ) $800A @ ;
 : ms ( n -- ) ms@ + begin service? dup ms@ - 0< until drop ;
@@ -414,6 +424,8 @@ variable rclo
 variable rchi
 variable rflag
 variable pp
+variable s-in        \ status: input bytes, taken once so both passes print the same
+variable dacc
 
 : noop ( -- ) ;
 : lf ( -- ) 10 emit ;
@@ -449,11 +461,11 @@ variable pp
 
 : p-echo ( -- ) ea @ en @ type ;
 : p-version ( -- )
-  ." firmware max1000-forth 1.1" lf ." protocol 1" lf
+  ." firmware max1000-forth 1.2" lf ." protocol 1" lf
   ." kernel " dp0 @ 2/ (u.) space kcheck @ hex4 lf ;
 : p-status ( -- )
   ." state running" lf ." pc 0000" lf
-  ." input " $800E @ fsrc @ + (u.) lf
+  ." input " s-in @ (u.) lf
   ." starts " starts @ (u.) lf
   ." source " s-state @ dup 0= if ." none" then dup 1 = if ." stored" then
   2 = if ." damaged" then lf
@@ -514,9 +526,17 @@ variable pp
 : on/off ( -- f ok? )
   rq-word 2dup s" on" =s if 2drop -1 -1 exit then
   s" off" =s if 0 -1 else 0 0 then ;
+\ decimal digits as a number; not ok for anything else or a value above 65535
+: dec16 ( a n -- u ok? )
+  0 dacc ! begin dup while
+    over c@ 48 - dup 9 u> if drop 2drop 0 0 exit then
+    dacc @ 10 um* if 2drop 2drop 0 0 exit then
+    over + tuck u> if drop 2drop 0 0 exit then dacc !
+    1 /string
+  repeat 2drop dacc @ -1 ;
 : rq-store ( -- )
   rq-word dup 1 6 within 0= if 2drop s" args" refuse exit then
-  number? 0= if drop s" args" refuse exit then rlen !
+  dec16 0= if drop s" args" refuse exit then rlen !
   rq-word dup 8 <> if 2drop s" args" refuse exit then
   drop dup 4 hexnum rchi ! 4 + 4 hexnum rclo !
   on/off 0= if drop s" args" refuse exit then 1 and rflag !
@@ -533,7 +553,7 @@ variable pp
 : dispatch ( -- )
   s" echo" rq= if rq-word en ! ea ! ['] p-echo answer exit then
   s" version" rq= if ['] p-version answer exit then
-  s" status" rq= if ['] p-status answer exit then
+  s" status" rq= if $800E @ fsrc @ + s-in ! ['] p-status answer exit then
   s" words" rq= if ['] p-words answer exit then
   s" stack" rq= if sdepth @ 0< if s" busy" refuse exit then ['] p-stack answer exit then
   s" board" rq= if ['] p-board answer exit then
