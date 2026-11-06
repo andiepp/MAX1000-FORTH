@@ -436,6 +436,25 @@ ACC_SIM = {0x0F: 0x33, 0x28: 0x00, 0x29: 0x00, 0x2A: 0x00, 0x2B: 0x00, 0x2C: 0x8
 FLASH_BYTES = 0x800000
 FLASH_SAVE = 0x20000
 
+# Serial interfaces (rtl/uart_port.v, spi_port.v, i2c_port.v) at the transfer level, without
+# timing: WIRES joins pins (jumper wires on the header); a byte sent by a UART reaches every
+# enabled UART whose RX pin is joined to its TX pin (with the same divider; else it counts
+# as a framing error); an SPI transfer reads back what it sends when MISO is joined to its
+# MOSI, else the MISO pin's idle level in every bit; I2C devices are 256-byte register
+# memories (first byte written = register pointer, which then counts up), on the bus
+# whatever pins it uses. Everything sent is logged per unit (uart_log, spi_log).
+UART_FIFO = 1024
+
+
+class Uart:
+    def __init__(self):
+        self.div, self.pins, self.rxq, self.err = 417, 0, bytearray(), 0
+
+
+class Spi:
+    def __init__(self):
+        self.control, self.half, self.pins, self.pins_b, self.rx = 0, 24, 0, 0, 0
+
 
 class Machine:
     def __init__(self, mem, rx=b''):
@@ -474,11 +493,156 @@ class Machine:
         self.dds = [0, 0, 0]
         # PWM channel c: [period low as written, period (32 bits), duty, control]
         self.pwm = [[0, 0, 0, 0] for _ in range(4)]
+        self.wires = []                  # pairs of joined pins
+        self.i2c_devs = {}               # 7-bit address -> bytearray(256)
+        self.uart_log = [bytearray(), bytearray()]
+        self.spi_log = [[], []]
+        self.serial_reset()
+
+    def serial_reset(self):
+        self.uart = [Uart(), Uart()]
+        self.spi = [Spi(), Spi()]
+        self.i2c = {'quarter': 120, 'pins': 0, 'ack': 0, 'rx': 0, 'phase': 'idle', 'dev': None,
+                    'ptr': 0}
+
+    def net(self, pin):
+        """The pins joined to pin by wires (pin itself included)."""
+        nodes, grew = {pin}, True
+        while grew:
+            grew = False
+            for a, b in self.wires:
+                if (a in nodes) != (b in nodes):
+                    nodes |= {a, b}
+                    grew = True
+        return nodes
+
+    def uart_feed(self, pin, data):
+        """Bytes arriving at pin from outside (115200 Bd): every enabled UART whose RX pin
+        is joined to it receives them."""
+        for u in self.uart:
+            if u.pins & 0x8000 and (u.pins >> 8) & 0x3F in self.net(pin):
+                self.uart_rx(u, data, u.div == 417)
+
+    @staticmethod
+    def uart_rx(u, data, same_rate):
+        for b in data:
+            if not same_rate:
+                u.err |= 0x10
+            elif len(u.rxq) >= UART_FIFO:
+                u.err |= 0x08
+            else:
+                u.rxq.append(b)
+
+    def uart_send(self, k, b):
+        src = self.uart[k]
+        if not src.pins & 0x8000:
+            return
+        self.uart_log[k].append(b)
+        joined = self.net(src.pins & 0x3F)
+        for u in self.uart:
+            if u.pins & 0x8000 and (u.pins >> 8) & 0x3F in joined:
+                self.uart_rx(u, [b], max(u.div, 8) == max(src.div, 8))
+
+    def spi_xfer16(self, k, v):
+        s = self.spi[k]
+        if not s.pins & 0x8000:
+            return
+        mask = 0xFFFF if s.control & 0x10 else 0xFF
+        self.spi_log[k].append(v & mask)
+        miso = s.pins_b & 0x3F
+        if miso in self.net((s.pins >> 8) & 0x3F):
+            s.rx = v & mask
+        else:
+            s.rx = mask if (self.pins() >> miso) & 1 else 0
+
+    def i2c_cmd(self, v):
+        st = self.i2c
+        if not st['pins'] & 0x8000:
+            return
+        cmd, b = (v >> 8) & 7, v & 0xFF
+        mem = self.i2c_devs.get(st['dev'])
+        if cmd == 1:
+            st['phase'] = 'addr'
+        elif cmd == 2:
+            st['phase'] = 'idle'
+        elif cmd == 3:
+            st['ack'] = 0
+            if st['phase'] == 'addr':
+                if (b >> 1) in self.i2c_devs:
+                    st['dev'], st['ack'] = b >> 1, 1
+                    st['phase'] = 'read' if b & 1 else 'pointer'
+                else:
+                    st['phase'] = 'idle'
+            elif st['phase'] == 'pointer':
+                st['ptr'], st['phase'], st['ack'] = b, 'write', 1
+            elif st['phase'] == 'write':
+                mem[st['ptr']] = b
+                st['ptr'], st['ack'] = (st['ptr'] + 1) & 0xFF, 1
+        elif cmd in (4, 5):
+            if st['phase'] == 'read':
+                st['rx'] = mem[st['ptr']]
+                st['ptr'] = (st['ptr'] + 1) & 0xFF
+            else:
+                st['rx'] = 0xFF
+
+    def serial_read(self, a):
+        reg = (a >> 1) & 7
+        if a & 0xE0 == 0xA0:
+            u = self.uart[(a >> 4) & 1]
+            if reg == 0:
+                return (0x100 | u.rxq[0]) if u.rxq else 0
+            return {1: (1 if u.rxq else 0) | 2 | 4 | u.err, 2: u.div & 0xFFFF, 3: u.div >> 16,
+                    4: u.pins}.get(reg, 0)
+        if a & 0xE0 == 0xC0:
+            s = self.spi[(a >> 4) & 1]
+            return {0: s.rx, 2: s.control, 3: s.half, 4: s.pins, 5: s.pins_b}.get(reg, 0)
+        st = self.i2c
+        return {0: (st['ack'] << 8) | st['rx'], 1: st['quarter'], 2: st['pins']}.get(reg, 0)
+
+    def serial_store(self, a, v):
+        reg, v = (a >> 1) & 7, v & 0xFFFF
+        if a & 0xE0 == 0xA0:
+            k = (a >> 4) & 1
+            u = self.uart[k]
+            if reg == 0:
+                self.uart_send(k, v & 0xFF)
+            elif reg == 1:
+                u.err = 0
+            elif reg == 2:
+                u.div = (u.div & 0xFF0000) | v
+            elif reg == 3:
+                u.div = ((v & 0xFF) << 16) | (u.div & 0xFFFF)
+            elif reg == 4:
+                if not v & 0x8000:
+                    u.rxq = bytearray()
+                u.pins = v
+        elif a & 0xE0 == 0xC0:
+            k = (a >> 4) & 1
+            s = self.spi[k]
+            if reg == 0:
+                self.spi_xfer16(k, v)
+            elif reg == 2:
+                s.control = v & 0x1F
+            elif reg == 3:
+                s.half = v
+            elif reg == 4:
+                s.pins = v
+            elif reg == 5:
+                s.pins_b = v & 0x3F
+        elif a & 0xF0 == 0xE0:
+            if reg == 0:
+                self.i2c_cmd(v)
+            elif reg == 1:
+                self.i2c['quarter'] = v
+            elif reg == 2:
+                self.i2c['pins'] = v
 
     def pwm_pins(self):
-        """Pins owned by an enabled PWM channel, and their level: the ISS has no time
-        base for the waveform, so a pin reads high only at full duty (0xFFFF)."""
-        owns = level = 0
+        """Pins owned by a peripheral (push-pull), their level, and the I2C pins (open
+        drain, released between commands): the ISS has no time base for waveforms, so a
+        PWM pin reads high only at full duty (0xFFFF), the DDS pin low, a UART TX pin
+        high, SCK at its idle level (CPOL) and MOSI low."""
+        owns = level = od = 0
         if self.dds[2] & 0x8000:
             owns |= 1 << (self.dds[2] & 0x3F)
         for _, _, duty, control in self.pwm:
@@ -487,15 +651,30 @@ class Machine:
                 owns |= bit
                 if duty == 0xFFFF:
                     level |= bit
-        return owns, level
+        for u in self.uart:
+            if u.pins & 0x8000:
+                owns |= 1 << (u.pins & 0x3F)
+                level |= 1 << (u.pins & 0x3F)
+        for s in self.spi:
+            if s.pins & 0x8000:
+                owns |= (1 << (s.pins & 0x3F)) | (1 << ((s.pins >> 8) & 0x3F))
+                if s.control & 2:
+                    level |= 1 << (s.pins & 0x3F)
+        if self.i2c['pins'] & 0x8000:
+            od = (1 << (self.i2c['pins'] & 0x3F)) | (1 << ((self.i2c['pins'] >> 8) & 0x3F))
+        return owns, level & owns, od
+
+    def driven(self):
+        owns, _, od = self.pwm_pins()
+        return ((self.pin_dir & ~(owns | od)) | owns) & PIN_EXISTS
 
     def pins(self):
-        """Pin levels: driven pins read back their latch (or their PWM channel), inputs
-        see PIN_IDLE."""
-        owns, level = self.pwm_pins()
-        out = (self.pin_out & ~owns) | (level & owns)
-        drive = self.pin_dir | owns
-        return ((out & drive) | (PIN_IDLE & ~drive)) & PIN_EXISTS
+        """Pin levels: driven pins read back their latch (or their peripheral), released
+        I2C pins read high (pull-ups), other inputs see PIN_IDLE."""
+        owns, level, od = self.pwm_pins()
+        out = (self.pin_out & ~(owns | od)) | level
+        drive = self.driven()
+        return ((out & drive) | (PIN_IDLE & ~drive & ~od) | (od & ~owns)) & PIN_EXISTS
 
     def spi_select(self, on):
         if on and not self.spi_cs:
@@ -561,6 +740,8 @@ class Machine:
         return self.mem[a] | (self.mem[a + 1] << 8)
 
     def io_read(self, a):
+        if a & 0xF0 in (0xA0, 0xB0, 0xC0, 0xD0, 0xE0):
+            return self.serial_read(a)
         if a & 0xE0 == 0x40:
             return self.adc[(a >> 1) & 15]
         if a & 0xE0 == 0x60:
@@ -571,7 +752,7 @@ class Machine:
         port = ((a >> 3) & 7) - 2
         if a & 0xC0 == 0 and 0 <= port <= 1:
             shift, sel = 16 * port, (a >> 1) & 3
-            vec = [self.pins(), self.pin_out, self.pin_dir, 0][sel]
+            vec = [self.pins(), self.pin_out, self.pin_dir, self.driven()][sel]
             return ((vec & PIN_EXISTS) >> shift) & 0xFFFF
         if a & 0xF0 == 0x20:
             reg = (a >> 1) & 7
@@ -607,6 +788,9 @@ class Machine:
                 self.dds[2] = v
             return
         if a & 0x8000:
+            if a & 0xF0 in (0xA0, 0xB0, 0xC0, 0xD0, 0xE0):
+                self.serial_store(a, v)
+                return
             if a & 0xE0 == 0x80:
                 ch, sel, v = self.pwm[(a >> 3) & 3], (a >> 1) & 3, v & 0xFFFF
                 if sel == 0:
@@ -707,11 +891,15 @@ class Machine:
                 v = self.rd16(t & 0xFFFE)
                 if t == 0x8000 and self.rx:
                     self.rx.pop(0)
+                elif t in (0x80A0, 0x80B0) and self.uart[(t >> 4) & 1].rxq:
+                    self.uart[(t >> 4) & 1].rxq.pop(0)
             elif op == 14:
                 w = self.rd16(t & 0xFFFE)
                 v = (w >> 8) if t & 1 else (w & 0xFF)
                 if t == 0x8000 and self.rx:
                     self.rx.pop(0)
+                elif t in (0x80A0, 0x80B0) and self.uart[(t >> 4) & 1].rxq:
+                    self.uart[(t >> 4) & 1].rxq.pop(0)
             elif op == 15: v = self.dsp
             elif op == 16: v = n - t
             elif op == 17: v = t + 1
@@ -746,6 +934,7 @@ class Machine:
         self.leds = self.pin_out = self.pin_dir = 0
         self.pwm = [[0, 0, 0, 0] for _ in range(4)]
         self.dds = [0, 0, 0]
+        self.serial_reset()
         self.spi_select(False)
         self.restart_pending = False
         self.starts += 1
@@ -810,6 +999,10 @@ def main():
     r.add_argument('--steps', type=int, default=20_000_000)
     r.add_argument('--flash', help='flash image file (loaded if present, saved after the run)')
     r.add_argument('--button', action='store_true', help='hold the user button')
+    r.add_argument('--wire', action='append', default=[], metavar='A-B',
+                   help='join pins A and B (repeatable), e.g. 0-1')
+    r.add_argument('--i2c-dev', action='append', default=[], metavar='ADDR',
+                   help='an I2C register memory at this 7-bit address (repeatable, $hex ok)')
     args = ap.parse_args()
 
     comp = Compiler()
@@ -833,6 +1026,11 @@ def main():
         m = Machine(comp.mem, rx)
         if args.button:
             m.buttons = 1
+        for w in args.wire:
+            a, b = (int(x) for x in w.split('-'))
+            m.wires.append((a, b))
+        for d in args.i2c_dev:
+            m.i2c_devs[int(d[1:], 16) if d.startswith('$') else int(d, 0)] = bytearray(256)
         if args.flash and os.path.exists(args.flash):
             with open(args.flash, 'rb') as f:
                 data = f.read()

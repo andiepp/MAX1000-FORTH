@@ -4,7 +4,7 @@
     a GitHub release.
 
 .DESCRIPTION
-    1. Runs the simulator tests (sim\run_flash_tests.ps1, sim\test_protocol.py).
+    1. Runs the simulator tests (sim\run_flash_tests.ps1, sim\test_protocol.py, sim\test_serial.py).
     2. Builds the kernel and the FPGA configuration (scripts\build.ps1).
     3. Builds docs\Manual.pdf and docs\Implementation-Details.pdf (needs Python with 'markdown' and Microsoft Edge; skipped with
        -SkipPdf, then the committed PDFs are used).
@@ -13,11 +13,11 @@
        CHANGELOG, LICENSE.
 
 .EXAMPLE
-    .\scripts\Build-Release.ps1 -Version 1.2
+    .\scripts\Build-Release.ps1 -Version 1.3
 #>
 [CmdletBinding()]
 param(
-    [string]$Version = '1.2',
+    [string]$Version = '1.3',
     [switch]$SkipTests,
     [switch]$SkipPdf
 )
@@ -33,6 +33,8 @@ try {
         if ($LASTEXITCODE) { throw 'flash tests failed' }
         python sim\test_protocol.py
         if ($LASTEXITCODE) { throw 'protocol tests failed' }
+        python sim\test_serial.py
+        if ($LASTEXITCODE) { throw 'serial tests failed' }
     }
     & (Join-Path $root 'scripts\build.ps1')
     if (-not $SkipPdf) {

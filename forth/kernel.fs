@@ -199,6 +199,20 @@ variable dp2             \ next free byte of the data RAM (COLD resets it)
 : pin@ ( n -- f ) pin @ and 0<> ;
 : pin! ( f n -- ) swap if high else low then ;
 
+\ A pin given to a peripheral belongs to it until the peripheral lets it go: its
+\ latch and direction no longer count. Owners: 1..4 PWM 0..3, 5 UART 0, 6 UART 1,
+\ 7 SPI 0, 8 SPI 1, 9 I2C, 10 DDS. COLD clears the table (a restart resets the
+\ peripherals).
+$5E20 constant pin-owner  \ 32 bytes: the owner of each pin, 0 = none
+: owner ( pin -- id ) dup pin 2drop pin-owner + c@ ;
+\ (free) refuses a pin another owner has; the open words check every new pin
+\ first, then release their old pins and claim the new ones, so a refused one
+\ leaves everything as it was
+: (free) ( pin id -- pin ) over owner ?dup if <> if ."  pin taken" cr abort then else drop then ;
+: claim ( pin id -- ) 2dup (free) drop swap pin-owner + c! ;
+: (claim) ( pin id -- pin ) over swap claim ;
+: release ( id -- ) 32 0 do i pin-owner + c@ over = if 0 i pin-owner + c! then loop drop ;
+
 \ ---------------------------------------------------------------------------
 \ PWM: four channels at $8080 + 8c, each on any pin. The period counts
 \ 48 MHz clocks (32 bits), the duty is a fraction in 1/65536 (rtl/pwm.v).
@@ -213,8 +227,9 @@ variable dp2             \ next free byte of the data RAM (COLD resets it)
   over 1 24001 within 0= if ."  bad frequency" cr abort then
   >r >r 48000 0 r> um/mod nip 0 r> pwm-clocks ;
 : pwm-duty ( permille ch -- ) >r 0 max 1000 min 65535 um* 1000 um/mod nip r> pwm 4 + ! ;
-: pwm-pin ( pin ch -- ) >r dup pin 2drop $8000 or r> pwm 6 + ! ;
-: pwm-off ( ch -- ) pwm 6 + 0 swap ! ;
+: pwm-pin ( pin ch -- )
+  dup pwm drop >r r@ 1+ (free) r@ 1+ release r@ 1+ (claim) $8000 or r> pwm 6 + ! ;
+: pwm-off ( ch -- ) dup pwm 6 + 0 swap ! 1+ release ;
 
 \ ---------------------------------------------------------------------------
 \ DDS: a square wave on any pin from a 32-bit phase accumulator on its own
@@ -236,8 +251,86 @@ variable dp2             \ next free byte of the data RAM (COLD resets it)
   swap 23437 swap dds-d um/mod nip swap dds-tuning ;
 : dds-hz ( u -- ) 0 (dds-hz) ;        \ 0..65535 Hz
 : dds-khz ( u -- ) 1000 um* (dds-hz) ; \ 0..65535 kHz
-: dds-pin ( pin -- ) dup pin 2drop $8000 or $8064 ! dds-sync ;
-: dds-off ( -- ) 0 $8064 ! dds-sync ;
+: dds-pin ( pin -- ) 10 (free) 10 release 10 (claim) $8000 or $8064 ! dds-sync ;
+: dds-off ( -- ) 0 $8064 ! 10 release dds-sync ;
+
+\ ---------------------------------------------------------------------------
+\ Serial interfaces on any pin (rtl/uart_port.v, spi_port.v, i2c_port.v), as in
+\ ZYNQ-FPGA-FORTH32. UART u = 0, 1 at $80A0 + 16u: 8N1, 1 KB FIFOs; the baud
+\ rate is a double number (115200.). SPI s = 0, 1 at $80C0 + 16s: master, modes
+\ 0..3, 8 or 16 bits, up to 12 MHz; chip selects are ordinary pins. I2C at
+\ $80E0: master, open drain (pull-up resistors needed), clock stretching.
+\ ---------------------------------------------------------------------------
+
+variable cid                          \ the owner id of the unit being opened
+: uart-a ( u -- a ) dup 2 u< 0= if ."  bad uart" cr abort then 4 lshift $80A0 + ;
+: d2/u ( ud -- ud' ) dup 15 lshift rot 1 rshift or swap 1 rshift ;
+: m+u ( ud u -- ud' ) rot over + tuck u> rot swap - ;
+\ clocks per bit = 48000000 / baud, rounded; both halve until the baud fits in a cell
+: uart-div ( ud-baud u -- )
+  uart-a >r 2dup or 0= if ."  bad baud" cr abort then
+  >r >r $6C00 $02DC r> r>
+  begin dup while d2/u >r >r d2/u r> r> repeat drop
+  dup >r 1 rshift m+u r> ud/u
+  dup $FF00 and if ."  bad baud" cr abort then r@ 6 + ! r> 4 + ! ;
+: uart-open ( ud-baud tx rx u -- )
+  dup uart-a drop 5 + cid ! cid @ (free) swap cid @ (free) swap
+  >r >r cid @ 5 - uart-div r> r> cid @ release
+  cid @ (claim) 8 lshift swap cid @ (claim) or $8000 or cid @ 5 - uart-a 8 + ! ;
+: uart-close ( u -- ) dup uart-a 8 + 0 swap ! 5 + release ;
+: uart-emit ( c u -- ) uart-a begin service? dup 2 + @ 2 and until ! ;
+: uart-key? ( u -- f ) uart-a 2 + @ 1 and 0<> ;
+: uart-key ( u -- c ) uart-a begin service? dup 2 + @ 1 and until @ $FF and ;
+: uart-type ( a n u -- ) >r begin dup while over c@ r@ uart-emit 1 /string repeat 2drop r> drop ;
+\ bit 2 transmitter idle, bit 3 a received byte was lost, bit 4 framing error;
+\ reading clears bits 3 and 4
+: uart-status ( u -- bits ) uart-a 2 + dup @ $1C and 0 rot ! ;
+
+: spi-a ( s -- a ) dup 2 u< 0= if ."  bad spi" cr abort then 4 lshift $80C0 + ;
+: spi-open ( sck mosi miso s -- )
+  dup spi-a drop 7 + cid ! cid @ (free) >r cid @ (free) >r cid @ (free) r> r>
+  cid @ release cid @ (claim) >r cid @ (claim) 8 lshift swap cid @ (claim) or $8000 or
+  r> cid @ 7 - spi-a dup >r 10 + ! r> 8 + ! ;
+: spi-close ( s -- ) dup spi-a 8 + 0 over ! 0 swap 2 + ! 7 + release ;
+: spi-khz ( khz s -- )
+  >r dup 1 12001 within 0= if ."  bad frequency" cr abort then
+  24000 swap u/mod swap if 1+ then r> spi-a 6 + ! ;
+: spi-ctl ( bits mask s -- ) spi-a 4 + dup >r @ swap invert and or r> ! ;
+: spi-mode ( mode s -- ) >r 3 and 3 r> spi-ctl ;
+: spi-lsb ( f s -- ) >r 0<> 4 and 4 r> spi-ctl ;
+: spi-bits ( n s -- )
+  >r dup 16 = if drop $10 else 8 <> if ."  bad bits" cr abort then 0 then $10 r> spi-ctl ;
+: spi-xfer ( out s -- in ) spi-a tuck ! begin dup 2 + @ 1 and 0= until @ ;
+: spi-write ( a n s -- ) >r begin dup while over c@ r@ spi-xfer drop 1 /string repeat 2drop r> drop ;
+: spi-read ( a n s -- )
+  >r begin dup while 0 r@ spi-xfer >r over r> swap c! 1 /string repeat 2drop r> drop ;
+
+: (i2c) ( cmd -- status )
+  $80E0 ! begin $80E0 @ dup 0< while drop repeat
+  dup $200 and if ."  i2c timeout" cr abort then ;
+: i2c-open ( khz scl sda -- )
+  rot dup 1 1001 within 0= if ."  bad frequency" cr abort then
+  12000 swap u/mod swap if 1+ then >r
+  9 (free) swap 9 (free) swap 9 release
+  9 (claim) 8 lshift swap 9 (claim) or $8000 or r> $80E2 ! $80E4 ! ;
+: i2c-close ( -- ) 0 $80E4 ! 9 release ;
+: i2c-start ( -- ) $100 (i2c) drop ;
+: i2c-stop ( -- ) $200 (i2c) drop ;
+: i2c-write ( b -- ack? ) $FF and $300 or (i2c) $100 and 0<> ;
+: i2c-read ( ack? -- b ) if $400 else $500 then (i2c) $FF and ;
+\ start (or a repeated start), then the address byte: 7-bit address, rw 1 = read
+: i2c-addr ( addr rw -- ack? ) i2c-start swap 2* or i2c-write ;
+: (ack?) ( f -- ) 0= if i2c-stop ."  no ack" cr abort then ;
+: i2c! ( b reg addr -- ) 0 i2c-addr (ack?) i2c-write (ack?) i2c-write (ack?) i2c-stop ;
+: i2c@ ( reg addr -- b )
+  dup >r 0 i2c-addr (ack?) i2c-write (ack?) r> 1 i2c-addr (ack?) 0 i2c-read i2c-stop ;
+: i2c-probe ( addr -- f ) 0 i2c-addr i2c-stop ;
+: i2c-scan ( -- )
+  base @ >r hex 120 8 do i i2c-probe if i . then loop r> base ! cr ;
+\ COLD switches every peripheral that owns pins off (a restart has reset them
+\ already), so the owner table and the hardware agree
+: units-off ( -- )
+  4 0 do i pwm-off loop dds-off 2 0 do i uart-close i spi-close loop i2c-close ;
 
 \ ---------------------------------------------------------------------------
 \ Analog inputs: ADC1 of the MAX 10, 12 bits, 0..3.3 V (internal reference =
@@ -461,7 +554,7 @@ variable dacc
 
 : p-echo ( -- ) ea @ en @ type ;
 : p-version ( -- )
-  ." firmware max1000-forth 1.2" lf ." protocol 1" lf
+  ." firmware max1000-forth 1.3" lf ." protocol 1" lf
   ." kernel " dp0 @ 2/ (u.) space kcheck @ hex4 lf ;
 : p-status ( -- )
   ." state running" lf ." pc 0000" lf
@@ -487,23 +580,16 @@ variable dacc
   sdepth @ dup (u.) 0 begin 2dup > while space dup cells ssnap + @ hex4 1+ repeat
   2drop lf ;
 : pwm-ctl ( c -- ctl ) 3 lshift $8086 + @ ;
-\ pins of port p that an enabled PWM channel drives
-: pwm-own ( p -- mask )
-  pp ! 0 4 0 do
-    i pwm-ctl dup $8000 and 0= if drop else
-      $3F and dup 4 rshift pp @ = if 15 and 1 swap lshift or else drop then
-    then
-  loop ;
-\ the DDS's pin, if it is on and in port p
-: dds-own ( p -- mask )
-  $8064 @ dup $8000 and 0= if 2drop 0 exit then
-  $3F and dup 4 rshift rot = if 15 and 1 swap lshift else drop 0 then ;
-: port-word ( p -- lo hi )
-  dup 3 lshift $8010 + dup @ swap 4 + @ rot dup pwm-own swap dds-own or or ;
+\ levels and the pins driven now (outputs and peripheral pins) of port p
+: port-word ( p -- lo hi ) 3 lshift $8010 + dup @ swap 6 + @ ;
 : pwm-word ( -- lo hi )
   0 4 0 do i pwm-ctl $8000 and if 1 i lshift or then loop
   0 pwm-ctl $3F and 4 lshift or 1 pwm-ctl $3F and 10 lshift or
   2 pwm-ctl $3F and 3 pwm-ctl $3F and 6 lshift or ;
+\ pin functions: bit 15 on, bits 5..0 the pin; FN2 splits a pins register into
+\ its two functions (bits 5..0 and 13..8)
+: fnx ( x -- ) space hex4 ;
+: fn2 ( pins -- ) dup $803F and fnx dup $8000 and swap 8 rshift $3F and or fnx ;
 : p-board ( -- )
   ." board " led@ $FF and btn@ 1 and hex8 lf
   ." ports " 0 port-word hex8 space 1 port-word hex8 lf
@@ -511,7 +597,11 @@ variable dacc
   ." adc" 9 0 do space i adc-ch@ hex4 loop lf
   ." temp " temp-code@ hex4 lf
   ." accel " accel@ rot hex4 space swap hex4 space hex4 lf
-  ." dds " $8064 @ hex4 space $8060 @ $8062 @ hex8 lf ;
+  ." dds " $8064 @ hex4 space $8060 @ $8062 @ hex8 lf
+  ." fn" $80A8 @ fn2 $80B8 @ fn2
+  $80C8 @ dup fn2 $8000 and $80CA @ $3F and or fnx
+  $80D8 @ dup fn2 $8000 and $80DA @ $3F and or fnx
+  $80E4 @ fn2 lf ;
 : p-source ( -- )
   s-len @ 0 1 f-read begin dup while 0 spi emit 1- repeat drop f-end ;
 : tx-idle ( -- ) begin $8002 @ 4 and until ;
@@ -664,6 +754,22 @@ variable sn
   0 -rot >number nip 0=
   r> if swap negate swap then
   r> base ! ;
+\ A number with a trailing dot is an unsigned double cell ( lo hi ), for values
+\ above 65535 such as baud rates: 115200. ($ prefix for hex as with numbers)
+: d*base+ ( lo hi n -- lo' hi' )
+  >r base @ * swap base @ um* rot + r> m+u ;
+: >dnumber ( lo hi a n -- lo' hi' f )
+  begin dup while
+    over c@ digit? 0= if drop 2drop 0 exit then
+    >r 1 /string r> -rot >r >r d*base+ r> r>
+  repeat 2drop -1 ;
+: dnumber? ( a n -- lo hi f )
+  dup 2 < if 2drop 0 0 0 exit then
+  2dup + 1- c@ 46 <> if 2drop 0 0 0 exit then
+  1- base @ >r
+  over c@ 36 = over 1 > and if 16 base ! 1 /string then
+  >r >r 0 0 r> r> >dnumber
+  r> base ! ;
 
 \ ---------------------------------------------------------------------------
 \ Compiler
@@ -746,7 +852,11 @@ variable sn
     2dup number? if
       nip nip state @ if literal then
     else
-      drop type ."  ?" cr abort
+      drop 2dup dnumber? if
+        >r >r 2drop r> r> state @ if swap literal literal then
+      else
+        2drop type ."  ?" cr abort
+      then
     then
   then ;
 
@@ -779,7 +889,7 @@ variable sdepth
 
 : cold ( -- )
   dp0 @ dp ! latest0 @ latest ! 0 fsrc ! 0 fcr ! 0 serving ! 0 counting !
-  1 starts +! data0 dp2 ! accel-on
+  1 starts +! data0 dp2 ! accel-on 32 0 do 0 i pin-owner + c! loop units-off
   decimal 0 state !
   cr ." HF16 Forth on MAX1000" cr
   1 led!

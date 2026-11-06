@@ -256,26 +256,96 @@ module max1000_forth #(
         .dds_clk(pll_clk[2]), .out(dds_out), .enable(dds_en), .pin(dds_pin)
     );
 
-    reg [31:0] pwm_owns, pwm_value;                         // PWM channels and the DDS
+    // ------------------------------------------------------------------
+    // Serial interfaces on any pin (after ZYNQ-FPGA-FORTH32 3.1): UART 0/1 at 0x80A0/0x80B0
+    // (rtl/uart_port.v), SPI 0/1 at 0x80C0/0x80D0 (rtl/spi_port.v), I2C at 0x80E0
+    // (rtl/i2c_port.v). Inputs (RX, MISO, SCL, SDA) read the synchronized pin levels.
+    // ------------------------------------------------------------------
+    wire [63:0] pin_in = {32'd0, pin_sync};
+
+    wire [15:0] u0_rdata, u1_rdata, s0_rdata, s1_rdata, i2c_rdata;
+    wire        u0_tx, u1_tx, u0_en, u1_en;
+    wire [5:0]  u0_txp, u0_rxp, u1_txp, u1_rxp;
+    wire        s0_sck, s0_mosi, s0_en, s1_sck, s1_mosi, s1_en;
+    wire [5:0]  s0_sckp, s0_mosip, s0_misop, s1_sckp, s1_mosip, s1_misop;
+    wire        i2c_scl_low, i2c_sda_low, i2c_en;
+    wire [5:0]  i2c_sclp, i2c_sdap;
+
+    wire wr_u0  = io_store && mem_addr[7:4] == 4'hA;
+    wire wr_u1  = io_store && mem_addr[7:4] == 4'hB;
+    wire wr_s0  = io_store && mem_addr[7:4] == 4'hC;
+    wire wr_s1  = io_store && mem_addr[7:4] == 4'hD;
+    wire wr_i2c = io_store && mem_addr[7:4] == 4'hE;
+
+    uart_port u0 (
+        .clk(clk), .rst(cpu_rst), .we(wr_u0), .rd(mem_rd && cpu_t == 16'h80A0),
+        .reg_sel(mem_addr[3:1]), .rd_sel(io_addr[3:1]), .wdata(mem_wdata), .rdata(u0_rdata),
+        .rx_in(pin_in[u0_rxp]), .tx_out(u0_tx), .enable(u0_en), .tx_pin(u0_txp), .rx_pin(u0_rxp)
+    );
+    uart_port u1 (
+        .clk(clk), .rst(cpu_rst), .we(wr_u1), .rd(mem_rd && cpu_t == 16'h80B0),
+        .reg_sel(mem_addr[3:1]), .rd_sel(io_addr[3:1]), .wdata(mem_wdata), .rdata(u1_rdata),
+        .rx_in(pin_in[u1_rxp]), .tx_out(u1_tx), .enable(u1_en), .tx_pin(u1_txp), .rx_pin(u1_rxp)
+    );
+    spi_port s0 (
+        .clk(clk), .rst(cpu_rst), .we(wr_s0), .reg_sel(mem_addr[3:1]), .rd_sel(io_addr[3:1]),
+        .wdata(mem_wdata), .rdata(s0_rdata), .miso_in(pin_in[s0_misop]),
+        .sck_out(s0_sck), .mosi_out(s0_mosi), .enable(s0_en),
+        .sck_pin(s0_sckp), .mosi_pin(s0_mosip), .miso_pin(s0_misop)
+    );
+    spi_port s1 (
+        .clk(clk), .rst(cpu_rst), .we(wr_s1), .reg_sel(mem_addr[3:1]), .rd_sel(io_addr[3:1]),
+        .wdata(mem_wdata), .rdata(s1_rdata), .miso_in(pin_in[s1_misop]),
+        .sck_out(s1_sck), .mosi_out(s1_mosi), .enable(s1_en),
+        .sck_pin(s1_sckp), .mosi_pin(s1_mosip), .miso_pin(s1_misop)
+    );
+    i2c_port i2c0 (
+        .clk(clk), .rst(cpu_rst), .we(wr_i2c), .reg_sel(mem_addr[2:1]), .rd_sel(io_addr[2:1]),
+        .wdata(mem_wdata), .rdata(i2c_rdata),
+        .scl_in(pin_in[i2c_sclp]), .sda_in(pin_in[i2c_sdap]),
+        .scl_low(i2c_scl_low), .sda_low(i2c_sda_low), .enable(i2c_en),
+        .scl_pin(i2c_sclp), .sda_pin(i2c_sdap)
+    );
+
+    // ------------------------------------------------------------------
+    // Pin router: every output of a peripheral names its pin; an enabled one owns that pin
+    // (push-pull, or for I2C open drain: driven low or left to the pull-up). Owners of the
+    // same pin are ORed; the Forth words refuse a pin that is taken. An owned pin's latch
+    // and direction do not count.
+    // ------------------------------------------------------------------
+    localparam integer PP = PWM_CH + 7;      // PWM 0..3, DDS, UART TX 0/1, SPI SCK/MOSI 0/1
+    wire [PP-1:0]   pp_en  = {s1_en, s1_en, s0_en, s0_en, u1_en, u0_en, dds_en, pwm_en};
+    wire [PP-1:0]   pp_val = {s1_mosi, s1_sck, s0_mosi, s0_sck, u1_tx, u0_tx, dds_out, pwm_level};
+    wire [6*PP-1:0] pp_pin = {s1_mosip, s1_sckp, s0_mosip, s0_sckp, u1_txp, u0_txp, dds_pin,
+                              pwm_pin};
+
+    reg [31:0] pp_owns, pp_value, od_owns, od_low;      // per pin
     integer    p, q;
     always @* begin
-        pwm_owns  = 32'd0;
-        pwm_value = 32'd0;
+        pp_owns  = 32'd0;
+        pp_value = 32'd0;
+        od_owns  = 32'd0;
+        od_low   = 32'd0;
         for (p = 0; p < 32; p = p + 1) begin
-            for (q = 0; q < PWM_CH; q = q + 1)
-                if (pwm_en[q] && pwm_pin[6*q +: 6] == p) begin
-                    pwm_owns[p]  = 1'b1;
-                    pwm_value[p] = pwm_value[p] | pwm_level[q];
+            for (q = 0; q < PP; q = q + 1)
+                if (pp_en[q] && pp_pin[6*q +: 6] == p) begin
+                    pp_owns[p]  = 1'b1;
+                    pp_value[p] = pp_value[p] | pp_val[q];
                 end
-            if (dds_en && dds_pin == p) begin
-                pwm_owns[p]  = 1'b1;
-                pwm_value[p] = pwm_value[p] | dds_out;
+            if (i2c_en && i2c_sclp == p) begin
+                od_owns[p] = 1'b1;
+                od_low[p]  = od_low[p] | i2c_scl_low;
+            end
+            if (i2c_en && i2c_sdap == p) begin
+                od_owns[p] = 1'b1;
+                od_low[p]  = od_low[p] | i2c_sda_low;
             end
         end
     end
 
-    wire [31:0] pin_drive = (pin_dir | pwm_owns) & pin_exists;
-    wire [31:0] pin_level = (pin_out & ~pwm_owns) | (pwm_value & pwm_owns);
+    wire [31:0] owned     = pp_owns | od_owns;
+    wire [31:0] pin_drive = ((pin_dir & ~owned) | pp_owns | od_low) & pin_exists;
+    wire [31:0] pin_level = (pin_out & ~owned) | (pp_value & pp_owns);
 
     genvar g;
     generate
@@ -324,11 +394,15 @@ module max1000_forth #(
     // I/O registers (CPU side). A read returns its value in the cycle after the address,
     // like the RAM: io_addr holds the address, the multiplexer below is combinational.
     //   0x8000..0x800E  UART, LEDs, button, restart (write), ms timer, RX peek, RX count
-    //   0x8010 + 8p     port p (0..1): +0 pin levels, +2 output latch, +4 direction
+    //   0x8010 + 8p     port p (0..1): +0 pin levels, +2 output latch, +4 direction,
+    //                   +6 pins driven now (read only: outputs and peripheral pins)
     //   0x8020..0x802A  SPI (flash, accelerometer) and CRC-32
     //   0x8040 + 2c     ADC channel c (0..8), 12-bit code; 0x8052 temperature diode
     //   0x8060..0x8064  DDS: tuning low/high, control (rtl/dds.v)
     //   0x8080 + 8c     PWM channel c: +0/+2 period, +4 duty, +6 control (rtl/pwm.v)
+    //   0x80A0 + 16u    UART u (0..1): data, status, divider low/high, pins (rtl/uart_port.v)
+    //   0x80C0 + 16s    SPI s (0..1): data, status, control, half, pins, MISO pin (spi_port.v)
+    //   0x80E0..0x80E4  I2C: command/status, quarter, pins (rtl/i2c_port.v)
     // ------------------------------------------------------------------
     reg [15:0] io_rdata;
     reg        io_sel   = 1'b0;
@@ -361,7 +435,17 @@ module max1000_forth #(
     end
 
     always @* begin
-        if (io_addr[7:5] == 3'b010)
+        if (io_addr[7:4] == 4'hA)
+            io_rdata = u0_rdata;
+        else if (io_addr[7:4] == 4'hB)
+            io_rdata = u1_rdata;
+        else if (io_addr[7:4] == 4'hC)
+            io_rdata = s0_rdata;
+        else if (io_addr[7:4] == 4'hD)
+            io_rdata = s1_rdata;
+        else if (io_addr[7:4] == 4'hE)
+            io_rdata = i2c_rdata;
+        else if (io_addr[7:5] == 3'b010)
             io_rdata = (io_addr[5:1] <= 5'd9) ? {4'd0, adc_code} : 16'd0;
         else if (io_addr[7:5] == 3'b011)
             io_rdata = dds_rdata;
@@ -374,7 +458,7 @@ module max1000_forth #(
                 2'd0:    io_rdata = pin_sync[rd_bit0 +: 16] & pin_exists[rd_bit0 +: 16];
                 2'd1:    io_rdata = pin_out[rd_bit0 +: 16]  & pin_exists[rd_bit0 +: 16];
                 2'd2:    io_rdata = pin_dir[rd_bit0 +: 16]  & pin_exists[rd_bit0 +: 16];
-                default: io_rdata = 16'd0;
+                default: io_rdata = pin_drive[rd_bit0 +: 16];   // driven now (also by a peripheral)
             endcase
         else if (io_addr[7:4] == 4'd0)
             case (io_addr[3:1])

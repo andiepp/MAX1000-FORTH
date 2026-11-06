@@ -7,8 +7,8 @@ someone who wants to understand, change or extend the design. How to *use* the F
 the [user manual](Manual.md); the serial protocol the app speaks is protocol 1 of
 [ZYNQ-FORTH](https://github.com/andiepp/ZYNQ-FORTH) (its `docs/Protocol.md`).
 
-All figures in this document are those of release 1.2 (firmware 1.2, protocol 1, kernel of
-330 words and 10,514 bytes), unless a section names an earlier release for comparison. The PDF
+All figures in this document are those of release 1.3 (firmware 1.3, protocol 1, kernel of
+376 words and 12,646 bytes), unless a section names an earlier release for comparison. The PDF
 version, `docs/Implementation-Details.pdf`, is generated from this file by
 `python tools/manual_pdf.py design`.
 
@@ -42,20 +42,24 @@ Instead:
   sequence of 16-bit instructions, primitives are inlined as single instructions, a call
   takes one clock and a return is usually free. There is no inner interpreter.
 - **Alone on a small FPGA.** No soft processor, no boot loader, no external memory: HF16,
-  24 KB of block RAM and the peripherals in a 10M08, the smallest common MAX 10, with half
+  24 KB of block RAM and the peripherals in a 10M08, the smallest common MAX 10, with a fifth
   of its logic left free.
 - **Always recoverable.** The kernel is never changed by what is typed (`cold` restores the
   dictionary), Ctrl-R works in any loop, and a saved source that misbehaves can be skipped
   at the start with ESC or the user button.
-- **Compatible with ZYNQ-FORTH.** The same CPU (the Verilog file is identical), the same
-  word names and stack effects for the common words, the same saved-source format and the
-  same service protocol, so the ZYNQ-FORTH app (2.4 and later) works with the MAX1000.
-- **Use the whole board.** 8 LEDs, the user button, 23 digital pins with four PWM channels
-  and a DDS square-wave generator on any pin, nine analog inputs and the chip's temperature
-  diode, the LIS3DH accelerometer and the 8 MB serial flash.
-- **Small and checkable.** About 1,160 lines of Verilog (171 of them the CPU, plus Intel's
-  ADC control core), a 766-line kernel, and an instruction-set simulator that runs the kernel exactly as
-  the CPU does, against which 64 automatic checks run in seconds.
+- **Compatible with ZYNQ-FORTH.** The same CPU (the same Verilog, with one synthesis
+  attribute added for the MAX 10, section 3.7), the same word names and stack effects for the
+  common words, the same saved-source format and the same service protocol, so the
+  ZYNQ-FORTH app (2.4 and later) works with the MAX1000. The serial interfaces follow
+  ZYNQ-FPGA-FORTH32 3.1, in hardware and in their Forth words.
+- **Use the whole board.** 8 LEDs, the user button, 23 digital pins with four PWM channels,
+  a DDS square-wave generator, two UARTs, two SPI masters and an I2C master on any pin, nine
+  analog inputs and the chip's temperature diode, the LIS3DH accelerometer and the 8 MB
+  serial flash.
+- **Small and checkable.** About 1,700 lines of Verilog (173 of them the CPU, plus Intel's
+  ADC control core), an 896-line kernel, and an instruction-set simulator that runs the
+  kernel exactly as the CPU does, against which 122 automatic checks run in seconds; a
+  Verilog testbench checks the serial interfaces cycle by cycle.
 
 ### 1.2 Who does what
 
@@ -64,11 +68,11 @@ that exist only at build time (and the app, which only talks the protocol).
 
 | | FPGA logic (`rtl/*.v`) | Forth kernel on HF16 (`forth/kernel.fs`) | PC tools (`tools/`, `scripts/`) |
 |---|---|---|---|
-| Start-up | Configures from the internal flash with the RAM image; holds the CPU in reset until the PLL locks and 255 clocks more | `cold`: restores the dictionary, counts the start, switches the accelerometer on, prints the banner, runs the saved source, enters `quit` | `hf16.py` cross-compiles the kernel into the RAM image; Quartus puts it into the `.pof` |
+| Start-up | Configures from the internal flash with the RAM image; holds the CPU in reset until the PLL locks and 255 clocks more | `cold`: restores the dictionary, counts the start, switches the accelerometer on, frees all pins, prints the banner, runs the saved source, enters `quit` | `hf16.py` cross-compiles the kernel into the RAM image; Quartus puts it into the `.pof` |
 | Terminal | UART at 115,200 Bd, an 8 KB receive and a 1 KB send FIFO | `key`, `emit`, `accept-line`: reads, echoes, prints | — |
 | Interpreting and compiling | — | All of it: parsing, dictionary search, numbers, compiling, executing | — |
 | Arithmetic | One-clock ALU with a 16 × 16 multiplier (low and high product) | Division, 32-bit products and quotients, `*/`, the DDS tuning word | — |
-| Board I/O | I/O registers: LEDs, button, timer, pins, PWM, DDS, ADC, SPI, CRC | Board words: `led!`, `pin@`, `pwm-hz`, `adc@`, `accel@`, `f-read` … | — |
+| Board I/O | I/O registers: LEDs, button, timer, pins, PWM, DDS, ADC, SPI, CRC; UARTs, SPI and I2C masters for the pins; the pin router | Board words: `led!`, `pin@`, `pwm-hz`, `adc@`, `accel@`, `f-read`, `uart-emit`, `spi-xfer`, `i2c@` …; the pin-owner table | — |
 | Service requests | Nothing special: the requests arrive in the same RX FIFO | `service?` answers them whenever Forth waits or polls | — |
 | Saved source | SPI master and CRC-32 unit | `store` writes it to the W25Q64 flash, `autoload` runs it at every start | `mforth.py --store` sends it |
 | Restart | Ctrl-R or a store to `$8008` resets the CPU, FIFOs and peripherals; the RAM keeps its contents | `cold` makes Forth fresh again | `mforth.py --restart`, `--skip` |
@@ -116,22 +120,24 @@ And an app request, say `SOH stack LF` sent while Forth waits at the prompt:
 
 | Path | Content |
 |---|---|
-| `rtl/hf16_cpu.v` | the HF16 CPU, 171 lines, identical to ZYNQ-FORTH's |
-| `rtl/max1000_forth.v` | top level: PLL, reset, RAM, UART and FIFOs, I/O decode and read multiplexer, LEDs, button, timer, pins, pin router |
-| `rtl/fifo_bram.v`, `rtl/uart.v` | first-word-fall-through FIFOs in M9K, UART transmitter and receiver |
+| `rtl/hf16_cpu.v` | the HF16 CPU, 173 lines, ZYNQ-FORTH's with one synthesis attribute added (section 3.7) |
+| `rtl/max1000_forth.v` | top level: PLL, reset, RAM, UART and FIFOs, I/O decode and read multiplexer, LEDs, button, timer, pins, the serial units' decode, pin router |
+| `rtl/fifo_bram.v`, `rtl/uart.v` | first-word-fall-through FIFOs in M9K, UART transmitter and receiver for the terminal |
 | `rtl/pwm.v` | four PWM channels (ZYNQ-FORTH's, with a separate read address) |
 | `rtl/dds.v` | DDS square-wave generator on its own 192 MHz clock (after ZYNQ-FPGA-FORTH32's) |
+| `rtl/uart_port.v`, `rtl/spi_port.v`, `rtl/i2c_port.v` | UART, SPI master and I2C master for the pins (after ZYNQ-FPGA-FORTH32 3.1's); the top level has two UARTs, two SPI masters and one I2C master |
 | `rtl/adc_scan.v` | ADC scanner around Intel's Modular ADC control core |
 | `rtl/spi_flash.v` | SPI master for the serial flash and the accelerometer, CRC-32 unit |
 | `constr/max1000_forth.sdc` | timing constraints |
 | `scripts/build.tcl`, `build.ps1` | Quartus project, pin assignments, build |
 | `scripts/program_flash.ps1` | writes the `.pof` (or `.sof`) over JTAG |
 | `scripts/Build-Release.ps1` | tests, build, manual PDF, release zip |
-| `forth/kernel.fs` | the Forth kernel, 766 lines of Forth |
+| `forth/kernel.fs` | the Forth kernel, 896 lines of Forth |
 | `tools/hf16.py` | cross-compiler and instruction-set simulator (ISS) |
 | `tools/mforth.py` | line sender, source store, restart from the PC |
 | `tools/manual_pdf.py` | builds `docs/Manual.pdf` and `docs/Implementation-Details.pdf` |
-| `sim/run_flash_tests.ps1`, `sim/test_protocol.py` | simulator tests: saved source (23 checks), service protocol (53 checks) |
+| `sim/run_flash_tests.ps1`, `sim/test_protocol.py`, `sim/test_serial.py` | simulator tests: saved source (23 checks), service protocol (56 checks), serial interfaces, pin owners and double numbers (43 checks) |
+| `sim/tb_serial.v`, `sim/run_serial.ps1` | testbench of the three serial units in the Vivado simulator (2,016 checks) |
 | `examples/bench.fs` | the bench demo of the manual |
 | `docs/` | user manual, this document, images |
 
@@ -171,7 +177,7 @@ The PLL makes three clocks from the 12 MHz oscillator; its VCO runs at 960 MHz:
 
 | Output | Ratio | Frequency | Used by |
 |---|---|---|---|
-| c1 | × 4 | 48 MHz | the CPU, RAM, FIFOs, UART, I/O registers, PWM, SPI, the ADC core's logic: one clock domain |
+| c1 | × 4 | 48 MHz | the CPU, RAM, FIFOs, UART, I/O registers, PWM, SPI, the serial interfaces, the ADC core's logic: one clock domain |
 | c0 | × 5 / 6 | 10 MHz | the ADC hard block's input clock |
 | c2 | × 16 | 192 MHz | the DDS phase accumulator |
 
@@ -187,23 +193,23 @@ worst path ran from the data stack's M9K (2.6 ns clock-to-output) through the
 read-during-write bypass, the 16 × 16 multiplier (4.0 ns), the ALU multiplexer and the next-T
 logic, and then on through the I/O decode and read multiplexer into a registered `io_rdata`. The fix was to register the *address* instead (`io_addr`) and select the I/O
 value combinationally in the next cycle, as the M9K does with its own address register. The
-next-T path now ends at a register again, and 48 MHz passes with 1.5 ns to spare. 48 MHz also
+next-T path now ends at a register again, and 48 MHz passes with about 1 ns to spare
+(section 2.3). 48 MHz also
 divides well: 48,000 clocks per millisecond, and 417 clocks per UART bit (115,108 Bd, 0.08 %
 slow).
 
 ### 2.2 Resources used
 
-From the fitter report of the 1.2 release build (`build/output_files/max1000_forth.fit.rpt`,
-Quartus Prime Lite 18.1). Release 1.2 changed only the kernel, which is the RAM's initial
-content, so the figures are those of 1.1:
+From the fitter report of the release 1.3 build (`build/output_files/max1000_forth.fit.rpt`,
+Quartus Prime Lite 18.1):
 
 | Resource | Used | Available | % |
 |---|---|---|---|
-| Logic elements | 4,259 | 8,064 | 53 |
-| of which combinational functions | 3,594 | 8,064 | 45 |
-| Registers | 2,069 | 8,064 | 26 |
-| M9K blocks | 36 | 42 | 86 |
-| Block memory bits | 272,128 | 387,072 | 70 |
+| Logic elements | 6,451 | 8,064 | 80 |
+| of which combinational functions | 5,708 | 8,064 | 71 |
+| Registers | 2,786 | 8,064 | 35 |
+| M9K blocks | 40 | 42 | 95 |
+| Block memory bits | 304,896 | 387,072 | 79 |
 | Embedded multiplier 9-bit elements | 18 | 48 | 38 |
 | PLLs | 1 (3 of 5 outputs) | 1 | 100 |
 | ADC blocks | 1 | 1 | 100 |
@@ -215,35 +221,50 @@ By design unit:
 
 | Unit | Logic elements | Registers | M9K | Multiplier elements |
 |---|---|---|---|---|
-| `pwm` (4 channels) | 1,734 | 1,220 | – | 16 |
-| `hf16_cpu` | 869 | 93 | 2 (the stacks) | 2 |
-| top level (`max1000_forth.v` itself) | 716 | 172 | – | – |
-| `adc_scan` (of which Intel's control core 232) | 431 | 247 | 1 (averaging FIFO) | – |
-| `dds` | 148 | 137 | – | – |
-| `spi_flash` | 102 | 50 | – | – |
-| RX FIFO / TX FIFO | 95 / 65 | 42 / 33 | 8 / 1 | – |
-| `uart_rx` / `uart_tx` | 90 / 65 | 42 / 31 | – | – |
-| RAM (two halves, decode) | 12 | 2 | 24 | – |
+| `pwm` (4 channels) | 1,753 | 1,220 | – | 16 |
+| top level (`max1000_forth.v` itself) | 1,520 | 172 | – | – |
+| `hf16_cpu` | 902 | 93 | 2 (the stacks) | 2 |
+| `adc_scan` (of which Intel's control core 230) | 432 | 247 | 1 (averaging FIFO) | – |
+| `uart_port` u0 / u1 (each with two 1 KB FIFOs of 62 or 63) | 411 / 413 | 192 / 192 | 2 / 2 | – |
+| `i2c_port` | 204 | 103 | – | – |
+| `spi_port` s0 / s1 | 190 / 175 | 115 / 115 | – | – |
+| `dds` | 141 | 137 | – | – |
+| `spi_flash` | 95 | 50 | – | – |
+| RX FIFO / TX FIFO | 95 / 64 | 42 / 33 | 8 / 1 | – |
+| `uart_rx` / `uart_tx` | 89 / 65 | 42 / 31 | – | – |
+| RAM (two halves, decode) | 9 | 2 | 24 | – |
 
-The 36 M9K blocks are the RAM (2 × 12), the RX FIFO (8), the TX FIFO (1), the two stacks (1
-each) and the temperature averaging FIFO of the ADC core (1, 64 × 12 bits). The four PWM
-channels are by far the largest unit: four 32-bit counters, comparators and two pipeline
-stages of 32 × 16 products each. The CPU itself is 869 logic elements.
+The 40 M9K blocks are the RAM (2 × 12), the RX FIFO (8), the TX FIFO (1), the two stacks (1
+each), the temperature averaging FIFO of the ADC core (1, 64 × 12 bits) and the four 1 KB
+FIFOs of the two UARTs (1 each). The four PWM channels are still the largest unit: four
+32-bit counters, comparators and two pipeline stages of 32 × 16 products each. The CPU
+itself is 902 logic elements.
+
+The serial interfaces of release 1.3 cost about 2,200 logic elements: the design has 6,451,
+release 1.2 had 4,259. 1,393 are in the five units; a UART's own logic (287 logic elements)
+is mostly its 24-bit divider and bit counters. Most of the rest is the top level's growth
+from 716 to 1,520:
+the pin router now chooses among 13 sources for each of the 32 pin positions, six
+multiplexers pick the serial inputs from the pins, and the read multiplexer has five more
+blocks (section 4.7).
 
 ### 2.3 Timing
 
-From the timing analyzer of the 1.2 build (`max1000_forth.sta.summary`), slow model, 1200 mV,
+From the timing analyzer of the 1.3 build (`max1000_forth.sta.summary`), slow model, 1200 mV,
 85 °C (the worst corner):
 
 | Clock | Setup slack | Hold slack | Fmax |
 |---|---|---|---|
-| c1, CPU clock, 48 MHz (20.833 ns) | 1.545 ns | 0.340 ns | 51.85 MHz |
-| c2, DDS clock, 192 MHz (5.208 ns) | 1.168 ns | 0.485 ns | 247.52 MHz |
+| c1, CPU clock, 48 MHz (20.833 ns) | 1.056 ns | 0.301 ns | 50.56 MHz |
+| c2, DDS clock, 192 MHz (5.208 ns) | 1.031 ns | 0.485 ns | 239.41 MHz |
 
-At 0 °C the slacks are 2.826 ns and 1.537 ns. All constraints are met. The CPU clock's
-worst paths are still the stack RAM → multiplier → ALU → next-T paths of section 2.1, now
-ending at the RAM's and `io_addr`'s address registers. The 192 MHz domain holds only the
-32-bit phase adder and the handshake.
+At 0 °C the setup slacks are 2.203 ns and 1.253 ns. All constraints are met. The CPU clock's
+worst paths are still the stack RAM → multiplier → ALU → next-T paths of section 2.1. In the
+1.3 build they go on from the next T through `mem_addr` and the store decode of the I2C block
+(`wr_i2c`) to the enable of `i2c_port`'s stretch counter, which a command clears when it
+starts: 1.056 ns of slack, against 1.545 ns in release 1.2, where the worst paths ended at the
+RAM's and `io_addr`'s address registers. The 192 MHz domain holds only the 32-bit phase adder
+and the handshake.
 
 Quartus reports critical warning 16248 for pins next to the ADC inputs (LED1..LED7, the UART,
 the flash pins and D4): switching I/O there may disturb the ADC's sampling. The pins are
@@ -251,7 +272,8 @@ fixed by the board; `build.ps1` filters the warning.
 
 ## 3 The HF16 CPU
 
-`rtl/hf16_cpu.v`, 171 lines of Verilog, the same file as in ZYNQ-FORTH. HF16 follows the
+`rtl/hf16_cpu.v`, 173 lines of Verilog, ZYNQ-FORTH's file with one synthesis attribute added
+(section 3.7). HF16 follows the
 scheme of the J1 Forth CPU (James Bowman, 2010): a dual-stack machine with literal, jump,
 conditional-branch, call and ALU instructions, where one ALU instruction can change the top
 of stack, move both stack pointers, store to memory and return, all in one clock.
@@ -397,11 +419,12 @@ and nothing to schedule anywhere else.
 
 **I/O reads with side effects.** Because loads are started speculatively, the I/O decoder
 "reads" a register whenever T happens to hold its address. All reads are therefore free of
-side effects except one: `$8000`, which pops the RX FIFO. It pops only when an instruction
-actually consumes [T]: the CPU's `mem_rd` output is set by an ALU instruction with op 13 or
-14, and the top level qualifies it with the full address in T
-(`rx_pop = mem_rd && T == 16'h8000`). An alias of `$8000` (such as `$8100`) reads the byte
-without taking it.
+side effects except three: `$8000`, which pops the RX FIFO, and `$80A0` and `$80B0`, which pop
+the receive FIFOs of UART 0 and 1 (section 4.12). They pop only when an instruction actually
+consumes [T]: the CPU's `mem_rd` output is set by an ALU instruction with op 13 or 14, and
+the top level qualifies it with the full address in T (`rx_pop = mem_rd && T == 16'h8000`,
+and `mem_rd && cpu_t == 16'h80A0` or `16'h80B0` for the UARTs). An alias (such as `$8100` or
+`$81A0`) reads the byte without taking it.
 
 **Why the I/O read multiplexer sits on `io_addr`.** RAM and I/O behave the same way for the
 CPU: the value of an address arrives in the cycle after the address was formed. The RAM does
@@ -447,6 +470,14 @@ writes `dstack[dsp_n]` at the same edge at which the read address becomes `dsp_n
 read-during-write of the same entry; Quartus adds a small bypass multiplexer for it (two
 logic levels behind the M9K, visible in the timing path of section 2.1).
 
+Up to release 1.2 Quartus made that choice by itself. During the work on release 1.3, with
+the four FIFO blocks of the new UARTs (38 of the 42 M9K in use without the stacks), it built
+the stacks from flip-flops instead: the CPU grew to 2,043 logic elements, the design to
+7,553 (94 %), and the CPU clock's slack fell to 0.024 ns, through a 32-way multiplexer behind
+`dsp`. Since release 1.3 `hf16_cpu.v` makes the choice explicit with
+`(* ramstyle = "M9K" *)` on `dstack` and `rstack`, the only change against ZYNQ-FORTH's file.
+The stacks are back in M9K, the design at 6,451 logic elements and the slack at 1.056 ns.
+
 ## 4 Memory and I/O
 
 ![Memory map](images/design-memory.svg)
@@ -471,7 +502,7 @@ reliably:
 Code and data share the RAM: the Forth compiler, running on HF16, writes new code with
 ordinary stores, and the code port fetches it in the next instruction. **The 16 KB code
 limit** follows from the 13-bit word addresses in jumps, calls and the PC: a colon
-definition must lie below 0x4000. The kernel takes 10,514 bytes of it, leaving 5,870 bytes
+definition must lie below 0x4000. The kernel takes 12,646 bytes of it, leaving 3,738 bytes
 for typed definitions. The 8 KB above it (0x4000–0x5FFF) can be read and written but not
 executed; the kernel hands out 0x4000–0x5BFF as **data RAM** with `buffer:` and keeps its
 own buffers in 0x5C00–0x5FFF (section 5.2). Nothing checks that the dictionary stays below
@@ -484,14 +515,17 @@ decoded, so the 128 registers repeat every 256 bytes up to `$FFFF`; unused regis
 and ignore writes.
 
 - **Stores** are decoded from `mem_addr`, which is T during a store: `io_store = mem_we &&
-  mem_addr[15]`, then per block (`io_pwm`, `io_dds`, `io_spi`, `io_gpio`, the LED register, the
-  restart register `$8008`, the TX FIFO push at `$8000`). The write data is N (`mem_wdata`).
+  mem_addr[15]`, then per block (`io_pwm`, `io_dds`, `io_spi`, `io_gpio`, `wr_u0`, `wr_u1`,
+  `wr_s0`, `wr_s1`, `wr_i2c`, the LED register, the restart register `$8008`, the TX FIFO push
+  at `$8000`). The write data is N (`mem_wdata`).
 - **Reads** are decoded from `io_addr`, the address of the previous clock. A priority
-  multiplexer looks at `io_addr[7:4]`: `$8040–$805F` the ADC codes (slot 0..9, higher slots
-  0), `$8060–$807F` the DDS, `$8080–$809F` the PWM channels, `$8020–$802F` the SPI master and
+  multiplexer looks at `io_addr[7:4]`: `$80A0–$80EF` the serial units (UART 0, UART 1, SPI 0,
+  SPI 1, I2C, 16 bytes each), `$8040–$805F` the ADC codes (slot 0..9, higher slots 0),
+  `$8060–$807F` the DDS, `$8080–$809F` the PWM channels, `$8020–$802F` the SPI master and
   CRC, `$8010–$801F` the two pin ports, `$8000–$800F` the UART, LEDs, button and timer.
-  The peripheral modules (`pwm`, `dds`, `spi_flash`) therefore have two register selects:
-  one from `mem_addr` for stores and one from `io_addr` for reads.
+  The peripheral modules (`pwm`, `dds`, `spi_flash`, `uart_port`, `spi_port`, `i2c_port`)
+  therefore have two register selects: one from `mem_addr` for stores and one from `io_addr`
+  for reads. The UARTs also get a read strobe for their data register (section 3.5).
 - **The data port's read data** is `mem_rdata = io_sel ? io_rdata : {hi_b, lo_b}`, with
   `io_sel` the registered address bit 15.
 
@@ -510,6 +544,7 @@ and ignore writes.
 | `$8010 + 8p` | port p (0, 1): pin levels, synchronized | – |
 | `$8012 + 8p` | port p: output latch | the same |
 | `$8014 + 8p` | port p: direction, 1 = output (0 after reset) | the same |
+| `$8016 + 8p` | port p: pins driven now, by their direction bit or by a peripheral (section 4.7) | – |
 | `$8020` | SPI: the byte received last | SPI: send a byte (starts an 8-bit exchange; ignored while busy) |
 | `$8022` | bit 0 = flash selected, bit 1 = busy, bit 2 = accelerometer selected | bit 0 = select the flash, bit 1 = select the accelerometer |
 | `$8024` | – | reset the CRC |
@@ -524,11 +559,31 @@ and ignore writes.
 | `$8082 + 8c` | PWM channel c: period, high 16 bits (48 MHz clocks per cycle, at least 2) | the same (takes both halves) |
 | `$8084 + 8c` | PWM channel c: duty in 1/65536 of the period, `$FFFF` = always high | the same |
 | `$8086 + 8c` | PWM channel c: bit 15 on, bits 5..0 pin | the same |
+| `$80A0 + 16u` | UART u (0, 1): bits 7..0 the next received byte, bit 8 = there was one (the read takes it) | send a byte (pushed into the TX FIFO; dropped when it is full) |
+| `$80A2 + 16u` | UART u: bit 0 = a byte received, bit 1 = the TX FIFO has room, bit 2 = transmitter idle, bit 3 = a byte was lost (RX FIFO full), bit 4 = framing error | any value: clear bits 3 and 4 |
+| `$80A4 + 16u` | UART u: clocks per bit, bits 15..0 (417 after reset; below 8 works as 8) | the same |
+| `$80A6 + 16u` | UART u: clocks per bit, bits 23..16 (in bits 7..0) | the same |
+| `$80A8 + 16u` | UART u: bit 15 on, bits 13..8 RX pin, bits 5..0 TX pin | the same (off empties both FIFOs) |
+| `$80C0 + 16s` | SPI s (0, 1): the value received by the last transfer | start a transfer with this value (ignored while busy) |
+| `$80C2 + 16s` | SPI s: bit 0 busy | – |
+| `$80C4 + 16s` | SPI s: bit 0 CPHA, bit 1 CPOL, bit 2 LSB first, bit 4 16 bits (else 8) | the same |
+| `$80C6 + 16s` | SPI s: clocks per half SCK period (24 after reset; below 2 works as 2) | the same |
+| `$80C8 + 16s` | SPI s: bit 15 on, bits 13..8 MOSI pin, bits 5..0 SCK pin | the same |
+| `$80CA + 16s` | SPI s: bits 5..0 MISO pin | the same |
+| `$80E0` | I2C: bit 15 busy, bit 9 timeout, bit 8 ACK received (last write), bits 7..0 the byte read | bits 10..8 command (1 start, 2 stop, 3 write a byte, 4 read a byte and ACK, 5 read a byte and NACK), bits 7..0 the byte to write; ignored while busy |
+| `$80E2` | I2C: clocks per quarter SCL period (120 after reset; below 4 works as 4) | the same |
+| `$80E4` | I2C: bit 15 on, bits 13..8 SDA pin, bits 5..0 SCL pin | the same |
+
+The DDS and the I2C master decode only address bits 2..1, so inside their blocks the
+registers repeat every 8 bytes (`$80E8` is the I2C command register again, and `$80E6` reads
+the I2C pins). The UART and SPI blocks read 0 above their last register and ignore writes
+there.
 
 ### 4.4 UART and FIFOs
 
-`rtl/uart.v` holds an 8N1 transmitter and receiver with `CLKS_PER_BIT` = (48,000,000 +
-57,600) / 115,200 = 417:
+This is the terminal's UART; the two UARTs for the pins are in section 4.12. `rtl/uart.v`
+holds an 8N1 transmitter and receiver with `CLKS_PER_BIT` = (48,000,000 + 57,600) / 115,200 =
+417:
 
 - **Receiver:** the RX pin passes a two-flop synchronizer. A low level starts a byte; the
   counter waits half a bit and checks that the start bit is still low (a
@@ -570,6 +625,7 @@ sw_restart`, a one-clock pulse, and `cpu_rst = sys_rst | restart`. `sw_restart` 
 | all PWM channels off (all their registers 0) | the ADC scanner (it runs on the power-on reset) |
 | the DDS off (tuning and control 0) | the PLL |
 | the SPI master: both selects released, CRC reset | |
+| the UARTs, SPI and I2C masters for the pins: off, FIFOs empty, rates and modes as after power-up | |
 
 The byte 0x12 is not pushed into the RX FIFO (`push = urx_valid && urx_data != 8'h12`), so
 Forth never sees it. The reset clears the FIFO in the same clock, which removes whatever was
@@ -614,29 +670,47 @@ Pin 15 and pins 24..31 do not exist: `PIN_EXISTS = 32'h00FF_7FFF` masks them, so
 ignore writes and are never driven; the Forth word `pin` refuses them. All pins are inputs
 after reset.
 
-**Ownership.** A PWM channel or the DDS that is switched on *owns* the pin its control
-register names. For each of the 32 pin positions the top level computes, combinationally:
+**Ownership.** Thirteen peripheral outputs can drive a pin: eleven push-pull ones (PWM
+channels 0..3, the DDS, TX of the two UARTs, SCK and MOSI of the two SPI masters) and two
+open-drain ones (SCL and SDA of the I2C master). Each names its pin in a register; switched
+on, it *owns* that pin. For each of the 32 pin positions the top level computes,
+combinationally:
 
 ```
-pwm_owns[p]  = any enabled PWM channel, or the enabled DDS, names pin p
-pwm_value[p] = OR of their levels
-pin_drive    = (pin_dir | pwm_owns) & PIN_EXISTS
-pin_level    = (pin_out & ~pwm_owns) | (pwm_value & pwm_owns)
+pp_owns[p]  = a push-pull source that is on names pin p
+pp_value[p] = OR of their levels
+od_owns[p]  = the I2C master is on and SCL or SDA is pin p
+od_low[p]   = OR of their "pull low" outputs
+owned       = pp_owns | od_owns
+pin_drive   = ((pin_dir & ~owned) | pp_owns | od_low) & PIN_EXISTS
+pin_level   = (pin_out & ~owned) | (pp_value & pp_owns)
 ```
 
-An owned pin is driven with the generator's level whatever its direction bit says; switched
-off, the pin returns to its latch and direction. Several owners of one pin are ORed: the
-hardware does not arbitrate, and the MAX1000 kernel keeps no ownership table either (unlike
-ZYNQ-FPGA-FORTH32). The levels of driven pins are read back through the synchronizer like
-inputs, so `pin@` on a PWM pin shows the waveform, and the `board` answer reports owned pins
-as driven (section 5.13).
+An owned pin ignores its latch and direction bits: a push-pull owner drives its level, an
+open-drain owner drives the pin low or leaves it to the pull-up resistor. Switched off, the
+pin returns to its latch and direction. The hardware does not arbitrate: several owners of
+one pin are ORed. Since release 1.3 the kernel's owner table gives each pin to one unit at
+most (section 5.11); in release 1.2 two generators on one pin were ORed.
+
+**Inputs.** The serial inputs (RX of each UART, MISO of each SPI master, SCL and SDA) read the
+synchronized levels at the pin number in their pins register: `pin_in = {32'd0, pin_sync}`,
+indexed with the 6-bit number, so numbers 32..63 read 0. Six such multiplexers feed the
+units. A pin is read whether it is driven or not; with TX and RX (or MOSI and MISO) on the
+same pin a unit reads back what it sends. The levels of driven pins come back through the
+synchronizer like inputs, so `pin@` on a PWM pin shows the waveform.
+
+**Drive register.** `$8016` and `$801E` (offset +6 of each port) read `pin_drive`: the pins
+driven at that moment, by their direction bit or by a peripheral. An I2C pin counts while it
+is pulled low. The `board` answer reports it (section 5.13); up to release 1.2 the kernel
+worked the same out from the PWM and DDS control registers.
 
 **Pull-ups.** By default the pins have none, so an open input reads at random.
 `scripts/build.ps1 -PullUps` sets the MAX 10's weak pull-ups on D0..D14 and PIO1..PIO8 in the
 configuration; Forth cannot switch them. The option is off by default because the bench has
 LEDs with 1 kΩ to ground on D3..D5, which a pull-up keeps faintly lit while the pin is an
 input. Pins the design does not use at all are reserved as inputs with weak pull-ups
-(`RESERVE_ALL_UNUSED_PINS_WEAK_PULLUP`).
+(`RESERVE_ALL_UNUSED_PINS_WEAK_PULLUP`). I2C needs pull-up resistors on SCL and SDA
+(section 4.12); the board has none on the header and Pmod pins.
 
 ### 4.8 PWM
 
@@ -681,13 +755,12 @@ written, as with the PWM period) and the control word (bit 15 on, bits 5..0 the 
 Bit 14 of the control register reads "busy or dirty"; the kernel's `dds-sync` waits for it to
 clear. Turning the DDS on (or off) restarts the phase at 0; a new tuning word while it runs
 keeps the phase going, so a frequency change has no glitch. The output bit is registered on
-the 192 MHz clock. Like a PWM channel the DDS owns its pin while on (ORed with a PWM channel
-on the same pin), and a CPU reset turns it off: the reset clears both registers and sends
-them across like a write.
+the 192 MHz clock. Like a PWM channel the DDS owns its pin while on (section 4.7), and a CPU
+reset turns it off: the reset clears both registers and sends them across like a write.
 
-The DDS uses 148 logic elements in its own unit (about 200 with its pin routing and read
-path) and no RAM; the 32-bit adder meets 192 MHz with 1.17 ns of slack. Release 1.1 also
-narrowed the ADC's read decode to `$8040–$805F` to make room for the DDS at `$8060`.
+The DDS uses 141 logic elements in its own unit (1.3 build) and no RAM; the 32-bit adder
+meets 192 MHz with 1.03 ns of slack. Release 1.1 also narrowed the ADC's read decode to
+`$8040–$805F` to make room for the DDS at `$8060`.
 
 ### 4.10 ADC and temperature diode
 
@@ -736,7 +809,8 @@ The board read about 31.7 °C on the bench. `temp-code@` returns the raw code.
 
 ### 4.11 SPI master, serial flash, accelerometer and CRC-32
 
-`rtl/spi_flash.v` is a byte-wide SPI master shared by two devices, each on its own pins: the
+`rtl/spi_flash.v` (not to be confused with the SPI masters for the pins, section 4.12) is a
+byte-wide SPI master shared by two devices, each on its own pins: the
 clock and data-out signals go to both, data-in comes from the selected one (`miso_sel =
 cs2_n ? F_DO : SEN_SDO`). Forth drives the select bits and every command byte; the hardware
 only shifts.
@@ -768,10 +842,90 @@ X, Y and Z on) and CTRL_REG4 (`$23`) = `$88` (block data update, high resolution
 `$28`) and shifts each left-justified 12-bit value right by 4, giving 1 mg per digit.
 WHO_AM_I (`$0F`) answers `$33` (`accel?`). The board lying flat reads z ≈ +1024 mg.
 
+### 4.12 Serial interfaces: UART, SPI and I2C
+
+`rtl/uart_port.v`, `rtl/spi_port.v` and `rtl/i2c_port.v` (release 1.3) are ZYNQ-FPGA-FORTH32
+3.1's `uart.v`, `spi.v` and `i2c.v`, rewritten for the 16-bit bus. The top level has two
+UARTs (`u0` at `$80A0`, `u1` at `$80B0`), two SPI masters (`s0` at `$80C0`, `s1` at `$80D0`)
+and one I2C master (`i2c0` at `$80E0`), each in a 16-byte block of its own. All five run on
+the 48 MHz CPU clock. Each names its pins in a register; the pin router connects its
+outputs to those pins, and its inputs read the pins' synchronized levels (section 4.7). The
+registers are in the I/O map (section 4.3) and in each file's header comment. A CPU reset
+switches all five off.
+
+The 16-bit bus changed the register layout:
+
+| | ZYNQ-FPGA-FORTH32 3.1 | MAX1000-FORTH 1.3 |
+|---|---|---|
+| UART divider | one register | 24 bits in two registers: +4 bits 15..0, +6 bits 23..16 |
+| UART FIFOs | 64 bytes | 1 KB in M9K (`fifo_bram.v`) |
+| SPI pins | one register: on, MISO, MOSI, SCK | +8 on, MOSI and SCK; +10 MISO |
+| SPI width | 8, 16 or 32 bits | 8 or 16 bits |
+
+Three 6-bit pin numbers and an enable bit do not fit 16 bits, hence the second SPI pins
+register; a 32-bit SPI transfer would not fit the data register.
+
+**UART.** 8N1 at any rate: the divider is the number of clocks per bit, 24 bits wide, so
+from 6,000,000 Bd (8 clocks, the smallest; smaller values work as 8, but the register reads
+back as written) down to about 3 Bd. After reset it is 417 (115,108 Bd for 115,200).
+
+- **Transmitter:** when it is idle and the TX FIFO is not empty it takes a byte and sends the
+  start bit, eight data bits LSB first and the stop bit, a divider's worth of clocks each.
+  Status bit 2 (idle) is set when the FIFO is empty and the stop bit is out.
+- **Receiver:** a high-to-low change of the synchronized RX level starts a byte. Half a bit
+  later the start bit must still be low (else it was a glitch); the eight data bits and the
+  stop bit are then sampled in the middle of each bit. A low stop bit sets the framing-error
+  flag (status bit 4) and drops the byte; a byte that finds the RX FIFO full sets the overrun
+  flag (bit 3) and is dropped. Writing the status register clears both flags.
+- **FIFOs:** 1 KB in each direction, each a `fifo_bram` with `DEPTH_LOG2` = 10 in one M9K. The
+  data register shows the next byte in bits 7..0 and sets bit 8 when there was one; the
+  instruction that consumes the read pops it (section 3.5), as `$8000` does for the
+  terminal. A byte written while the TX FIFO is full is dropped; `uart-emit` waits for room
+  instead (section 5.11). While the UART is off, both FIFOs are held empty and transmitter
+  and receiver are idle, so closing a UART discards what it had.
+
+**SPI master.** Modes 0..3 (control bit 0 CPHA, bit 1 CPOL), 8 or 16 bits per transfer
+(bit 4), MSB or LSB first (bit 2). SCK = 48 MHz / (2 × half), with half at least 2: at most
+12 MHz; after reset half is 24 (1 MHz). Chip selects are ordinary pins that Forth drives.
+
+- A store to the data register starts a transfer (ignored while busy). Each bit has two
+  halves of `half` clocks. With CPHA 0 the first bit is on MOSI when the transfer starts and
+  SCK makes its leading edge in the middle of each bit, its trailing edge at the end; with
+  CPHA 1 the leading edge comes at the start of each bit and the trailing edge in the middle.
+  MOSI changes at the end of each bit, and SCK rests at CPOL between transfers.
+- **MISO** is sampled at the end of each bit, just before the next change edge: in every mode
+  that is after the slave has set the bit. Because MISO passes the pin synchronizer, the
+  slave has 2 × half − 2 clocks between its shift edge and the sample for its output delay
+  and the wiring, 2 clocks (42 ns) at 12 MHz.
+- After the last bit, busy clears and the data register holds the received value, in the low
+  8 bits for an 8-bit transfer.
+
+**I2C master.** A command (bits 10..8 of `$80E0`) is one of: start (also a repeated start),
+stop, write a byte and read the ACK, read a byte and send ACK, read a byte and send NACK.
+Busy (bit 15) is set until it is done; then bit 8 holds the ACK of the last write and bits
+7..0 the byte read.
+
+- **Timing:** a command is a sequence of steps of quarter + 1 clocks. A bit takes four: SDA
+  set while SCL is low, SCL released, SDA sampled once SCL reads high, SCL low again. SCL is
+  therefore 48 MHz / (4 × (quarter + 1)): the kernel's quarter 120 for 100 kHz gives
+  99.2 kHz, 30 for 400 kHz gives 387 kHz. After a byte the master keeps SDA low, ready for a
+  stop.
+- **Clock stretching:** after releasing SCL the master waits until SCL reads high, so a slave
+  that holds SCL low stretches the bit. After 2²⁰ clocks (21.8 ms) of waiting within one
+  command the command ends with the timeout bit (9) set and both lines released.
+- **Open drain:** the unit has no output levels, only `scl_low` and `sda_low`; the pin router
+  drives a pin low or leaves it floating (section 4.7). SCL and SDA need pull-up resistors,
+  which the board does not have on its pins. The I2C pins are named in the pins register
+  (`$80E4`) like any other unit's: the MAX1000 has no dedicated SCL and SDA pins.
+
+The five units together use 1,393 logic elements and 4 M9K (section 2.2).
+`sim/tb_serial.v` checks them cycle by cycle (section 6.6), `sim/test_serial.py` the
+kernel's words for them in the simulator (section 6.5).
+
 ## 5 The Forth kernel
 
-The kernel is one Forth source file, `forth/kernel.fs` (786 lines). It compiles to a
-10,514-byte image (5,257 cells) with 330 words, and everything a user meets is in it: the
+The kernel is one Forth source file, `forth/kernel.fs` (896 lines). It compiles to a
+12,646-byte image (6,323 cells) with 376 words, and everything a user meets is in it: the
 interpreter, the compiler, number conversion, the board words, the saved source and the
 answers to the app. About a third of the words are internal.
 
@@ -808,9 +962,9 @@ for the request names); the target compiler has no `s"`.
 | Address | Content |
 |---|---|
 | `$0000` | jump to `cold` (the reset vector) |
-| `$0002`–`$2911` | the kernel: headers, code and variables, 10,514 bytes with the vector |
-| `$2912` | HERE after a cold start: new definitions grow upward |
-| `$3FFF` | the end of the code space: 5,870 bytes free (`unused`) |
+| `$0002`–`$3165` | the kernel: headers, code and variables, 12,646 bytes with the vector |
+| `$3166` | HERE after a cold start: new definitions grow upward |
+| `$3FFF` | the end of the code space: 3,738 bytes free (`unused`) |
 | `$4000`–`$5BFF` | data RAM handed out by `buffer:` (`dp2`, 7,168 bytes, `unused-data`) |
 | `$5C00`–`$5FFF` | the kernel's buffers, below |
 | `$6000`–`$7FFF` | no RAM |
@@ -823,11 +977,13 @@ for the request names); the target compiler has no `s"`.
 | `$5DA0` | `sbuf` | 64 | `.s` parks the stack here (32 cells) |
 | `$5DE0` | `ssnap` | 40 | the data stack at the last prompt, 20 cells, for the `stack` request |
 | `$5E10` | `hdr` | 16 | the saved source's header |
-| `$5E20`–`$5EFF` | – | 224 | not used, not handed out |
+| `$5E20` | `pin-owner` | 32 | the owner of each pin position (release 1.3, section 5.11) |
+| `$5E40`–`$5EFF` | – | 192 | not used, not handed out |
 | `$5F00` | `lbuf` | 256 | the piece of saved source being interpreted |
 
 The buffers are constants, not allotted space, so they cost no dictionary space and
-survive any amount of typed code. The variables (`dp`, `latest`, `state`, `base`, `fsrc` …)
+survive any amount of typed code. The same holds for the owner table: it takes 32 bytes of
+data RAM and no code space. The variables (`dp`, `latest`, `state`, `base`, `fsrc` …)
 are in the kernel image in the code space, as `variable` makes them.
 
 ### 5.3 Dictionary headers
@@ -854,24 +1010,26 @@ to 31 characters.
 | Stack and arithmetic | 708 | 32 | `rot`, `min`, `umin`, `abs`, `u/mod /mod / mod`, `um* um/mod */`, `within`, the `do` runtime |
 | Variables | 406 | 28 | `dp latest dp0 latest0 kcheck starts state base >in #tib`, `tib`, `here allot , c,`, `hex decimal` |
 | Board I/O | 426 | 15 | `key? key emit`, `led! led@ led-on led-off led-toggle btn@ ms@ ms` |
-| Digital pins | 248 | 10 | `pin output input high low toggle pin@ pin!` |
-| PWM | 334 | 8 | `pwm-hz pwm-khz pwm-duty pwm-pin pwm-off`, `ud/u` |
-| DDS | 238 | 8 | `dds-hz dds-khz dds-tuning dds-pin dds-off`, `(dds-hz)` |
+| Digital pins | 430 | 16 | `pin output input high low toggle pin@ pin!`, the owner table `pin-owner owner (free) claim (claim) release` |
+| PWM | 358 | 8 | `pwm-hz pwm-khz pwm-duty pwm-pin pwm-off`, `ud/u` |
+| DDS | 248 | 8 | `dds-hz dds-khz dds-tuning dds-pin dds-off`, `(dds-hz)` |
+| Serial interfaces | 1,676 | 37 | `uart-open uart-close uart-emit uart-key? uart-key uart-type uart-status`, `spi-open spi-close spi-khz spi-mode spi-lsb spi-bits spi-xfer spi-write spi-read`, `i2c-open i2c-close i2c-start i2c-stop i2c-write i2c-read i2c-addr i2c! i2c@ i2c-probe i2c-scan`, `uart-div d2/u m+u units-off` |
 | Analog inputs | 186 | 7 | `adc-ch@ adc@ mv@ temp-code@ temp@ .temp`, the table `ain` |
 | Accelerometer | 196 | 8 | `acc@ acc! accel? accel-on accel@` |
 | Serial flash | 348 | 15 | `spi f-read f-prog f-erase f-erase64 flash-id crc-reset crc+ crc@` |
 | Saved source | 1,572 | 37 | `store autostart erase-source .source source? load-source`, `autoload`, `fkey lfill` |
-| Service requests | 2,866 | 50 | `service? serve dispatch answer`, the payload words `p-…`, `rq-store dec16 rq-restart` |
+| Service requests | 2,828 | 50 | `service? serve dispatch answer`, the payload words `p-…`, `port-word fn2`, `rq-store dec16 rq-restart` |
 | Output | 440 | 17 | `cr space type (.") . u. .s ?`, `unused unused-data buffer:` |
 | Parsing | 208 | 4 | `parse-name parse` |
 | Dictionary search | 266 | 6 | `find-name name>xt same?` |
-| Numbers | 206 | 3 | `digit? >number number?` |
+| Numbers | 416 | 6 | `digit? >number number?`, double numbers `dnumber? >dnumber d*base+` |
 | Compiler | 730 | 36 | `header : ; literal create variable constant if then do loop ( \ ."` |
-| Interpreter | 756 | 11 | `words abort ?stack interpret-word interpret accept-line snap quit cold` |
+| Interpreter | 824 | 11 | `words abort ?stack interpret-word interpret accept-line snap quit cold` |
 
-Together with the 2-byte reset vector that is the 10,514 bytes. More than a quarter of the
-kernel is the service protocol, which on the Zynq is the ARM's job; with the saved source it is
-42 %.
+Together with the 2-byte reset vector that is the 12,646 bytes. Release 1.3 added 2,132
+bytes and 46 words: the serial interfaces (1,676 bytes), the owner table's words, the double
+numbers and the `fn` line of the `board` answer. More than a fifth of the kernel is the
+service protocol, which on the Zynq is the ARM's job; with the saved source it is 35 %.
 
 ### 5.5 Primitives, inlining and execute
 
@@ -924,13 +1082,26 @@ execution token on the return stack and returns into it:
     2dup number? if
       nip nip state @ if literal then
     else
-      drop type ."  ?" cr abort
+      drop 2dup dnumber? if
+        >r >r 2drop r> r> state @ if swap literal literal then
+      else
+        2drop type ."  ?" cr abort
+      then
     then
   then ;
 ```
 
 - **Numbers** (`number?`): an optional `-`, an optional `$` for hex, digits in `base`.
   Overflow is not detected; values wrap at 16 bits.
+- **Double numbers** (release 1.3, `dnumber?`): a token that is not a number but ends in a
+  dot, such as `115200.`, is an unsigned double number, pushed as two cells ( lo hi ). An
+  optional `$` selects hex; there is no sign. `>dnumber` accumulates the digits with
+  `d*base+`, which multiplies the double by `base` (the low cell with `um*`, the high cell
+  with `*`) and adds the digit with `m+u`; overflow wraps at 32 bits. Compiled, a double
+  number becomes two literals,
+  low cell first. The serial words need it for baud rates (section 5.11): 115,200 does not
+  fit a cell. The token is tried as a single number first, so `12` stays a single number and
+  only the trailing dot makes a double.
 - **`?stack`** guards the 32-entry hardware stack, which wraps silently. A dictionary search
   needs up to 9 data cells of its own (`find-name` → `match?` → `same?` → `upper`), so more
   than 20 user items count as overflow, and a depth above 28 means the pointer wrapped below
@@ -944,9 +1115,12 @@ execution token on the return stack and returns into it:
 - **`cold`** restores `dp` and `latest` from `dp0` and `latest0` (so the dictionary is the
   kernel's again), clears the load and answer state (`fsrc fcr serving counting`), counts the
   start (`starts`), resets the data RAM pointer `dp2` to `$4000`, switches the accelerometer
-  on, sets decimal and interpret state, prints `HF16 Forth on MAX1000`, lights LED1, runs
-  `autoload` and enters `quit`. Typed, `cold` (or `0 execute`) does the same without the
-  hardware reset, so pins, LEDs, PWM and DDS keep their state.
+  on, clears the pin-owner table and runs `units-off`, sets decimal and interpret state,
+  prints `HF16 Forth on MAX1000`, lights LED1, runs `autoload` and enters `quit`. Typed,
+  `cold` (or `0 execute`) does the same without the hardware reset: the pin latches and
+  directions keep their state, but `units-off` switches the PWM channels, the DDS and the
+  serial interfaces off, so the empty owner table and the hardware agree. Up to release 1.2
+  a typed `cold` left PWM and DDS running.
 
 ### 5.7 The compiler
 
@@ -1003,57 +1177,63 @@ full code space.
 ### 5.8 What lands in RAM
 
 Definitions typed on the simulated HF16 (`tools/hf16.py run`), and the RAM after them (the
-first new header follows `cold`'s, whose header is at `$278A`):
+first new header follows `cold`'s, whose header is at `$30C8`):
 
 ```
 : sq dup * ;
-2804  278A  header: link = 278A (cold's header)
-2806        count 02, "sq", padding
-280A  6001  dup                     inlined primitive
-280C  6A83  *                       inlined, one clock
-280E  700C  exit
+3166  30C8  header: link = 30C8 (cold's header)
+3168        count 02, "sq", padding
+316C  6001  dup                     inlined primitive
+316E  6A83  *                       inlined, one clock
+3170  700C  exit
 
 : big? 1000 > if 40000 else -1 then ;
-2818  83E8  literal 1000
-281A  40EF  call 01DE >
-281C  3412  0branch 2824            resolved by else
-281E  E3BF  literal 25535           40000 = not 25535
-2820  6300  invert
-2822  1414  jump 2828               resolved by then
-2824  8000  literal 0               -1 = not 0
-2826  6300  invert
-2828  700C  exit
+317A  83E8  literal 1000
+317C  40EF  call 01DE >
+317E  38C3  0branch 3186            resolved by else
+3180  E3BF  literal 25535           40000 = not 25535
+3182  6300  invert
+3184  18C5  jump 318A               resolved by then
+3186  8000  literal 0               -1 = not 0
+3188  6300  invert
+318A  700C  exit
 
 : count5 5 0 do i . loop ;
-2834  8005  literal 5
-2836  8000  literal 0
-2838  60C0  swap   ┐
-283A  6087  >r     │ do
-283C  6087  >r     ┘
-283E  6601  i = r@
-2840  4F51  call 1EA2 .
-2842  41F6  call 03EC (loop)
-2844  341F  0branch 283E
-2846  660D  r>     ┐
-2848  6083  drop   │ unloop
-284A  660D  r>     │
-284C  6083  drop   ┘
-284E  700C  exit
+3196  8005  literal 5
+3198  8000  literal 0
+319A  60C0  swap   ┐
+319C  6087  >r     │ do
+319E  6087  >r     ┘
+31A0  6601  i = r@
+31A2  5377  call 26EE .
+31A4  41F6  call 03EC (loop)
+31A6  38D0  0branch 31A0
+31A8  660D  r>     ┐
+31AA  6083  drop   │ unloop
+31AC  660D  r>     │
+31AE  6083  drop   ┘
+31B0  700C  exit
 
 variable v
-2854  A858  literal 2858            the variable's address
-2856  700C  exit
-2858  0000                          the value
+31B6  B1BA  literal 31BA            the variable's address
+31B8  700C  exit
+31BA  0000                          the value
+
+: baud 115200. ;
+31C4  BDFF  literal 15871           low cell 49664 = not 15871
+31C6  6300  invert
+31C8  8001  literal 1               high cell: 115200 = 1 × 65536 + 49664
+31CA  700C  exit
 ```
 
 The cross-compiled kernel shows the two optimizations of section 5.1:
 
 ```
 : led! ( n -- ) $8004 ! ;
-06B6  FFFB  literal 32763           $8004 = not 32763
-06B8  6300  invert
-06BA  60A3  store N at [T]          !
-06BC  708F  drop + return           the drop of ! with the exit folded in
+06C6  FFFB  literal 32763           $8004 = not 32763
+06C8  6300  invert
+06CA  60A3  store N at [T]          !
+06CC  708F  drop + return           the drop of ! with the exit folded in
 
 : rx? ( -- f ) $8002 @ 1 and 0<> ;
 05DC  FFFD  literal 32765
@@ -1087,7 +1267,9 @@ instruction counts measured in the simulator, so they are clocks on the board (o
   of the result kept on the return stack, so n1 × n2 never overflows in between; about 850
   instructions.
 - **`ud/u`** ( ud u -- ud' ), two `um/mod`s, divides a 32-bit number by a 16-bit one with a
-  32-bit quotient; `pwm-hz` uses it for 48,000,000 / hz.
+  32-bit quotient; `pwm-hz` uses it for 48,000,000 / hz, `uart-div` for 48,000,000 / baud.
+- **`m+u`** ( ud u -- ud' ) adds a single cell to a double, **`d2/u`** ( ud -- ud' ) halves a
+  double (release 1.3, for the double numbers and `uart-div`).
 - A double cell is ( low high ), high on top, as in Forth-2012.
 
 ```forth
@@ -1160,13 +1342,36 @@ next to it. Further words:
   HF16 has no interrupts and the service answers only read the LEDs, so nothing can change
   the register between the read and the write.
 
+- **Pin owners** (release 1.3): a pin given to a unit belongs to it until the unit lets it
+  go. `pin-owner` is a 32-byte table in the kernel's buffer area (`$5E20`, section 5.2), one
+  byte per pin position: 0 free, 1..4 PWM channels 0..3, 5 and 6 UART 0 and 1, 7 and 8 SPI 0
+  and 1, 9 the I2C master, 10 the DDS. The same ids and words as in ZYNQ-FPGA-FORTH32:
+
+  ```forth
+  : owner ( pin -- id ) dup pin 2drop pin-owner + c@ ;
+  : (free) ( pin id -- pin ) over owner ?dup if <> if ."  pin taken" cr abort then else drop then ;
+  : claim ( pin id -- ) 2dup (free) drop swap pin-owner + c! ;
+  : (claim) ( pin id -- pin ) over swap claim ;
+  : release ( id -- ) 32 0 do i pin-owner + c@ over = if 0 i pin-owner + c! then loop drop ;
+  : pwm-pin ( pin ch -- )
+    dup pwm drop >r r@ 1+ (free) r@ 1+ release r@ 1+ (claim) $8000 or r> pwm 6 + ! ;
+  ```
+
+  Every word that gives a unit pins works in three steps: it checks all new pins with
+  `(free)` (a pin the unit has already passes), then releases the unit's old pins, then claims
+  the new ones, and writes the unit's pins register last. A refused pin (` pin taken`) aborts
+  before anything has changed. `pwm-pin`, `dds-pin` and the three open words work this way;
+  `pwm-off`, `dds-off` and the close words switch the unit off and `release` its pins.
+  `owner` also checks the pin number (` bad pin`). The hardware would OR two owners of one
+  pin (section 4.7); in release 1.2, without the table, that happened.
 - **PWM:** `pwm ( ch -- a )` checks the channel and gives its register address;
   `pwm-hz ( hz ch -- )` writes the period 48,000,000 / hz (`ud/u`), `pwm-khz` 48,000 / khz
   (1..24,000 kHz), `pwm-duty ( permille ch -- )` the duty permille × 65,535 / 1000,
-  `pwm-pin ( pin ch -- )` checks the pin and writes it with bit 15 (on), `pwm-off` clears the
-  control register.
-- **DDS:** `dds-hz`, `dds-khz` (section 5.10), `dds-pin ( pin -- )` (checks the pin, writes
-  control with bit 15, waits for the handshake), `dds-off`.
+  `pwm-pin ( pin ch -- )` claims the pin (above) and writes it with bit 15 (on), `pwm-off`
+  clears the control register and releases the pin.
+- **DDS:** `dds-hz`, `dds-khz` (section 5.10), `dds-pin ( pin -- )` (claims the pin with
+  owner 10, writes control with bit 15, waits for the handshake), `dds-off` (also releases
+  the pin).
 - **Analog:** `adc-ch@ ( c -- u )` reads `$8040 + 2c`; `adc@ ( n -- u )` maps the header
   input through `ain` (section 4.10); `mv@` is `adc@ 3300 4096 */`; `temp@` is
   `3798 temp-code@ - 1360 288 */ 400 -` in tenths of a degree; `.temp` prints it.
@@ -1178,7 +1383,81 @@ next to it. Further words:
   `f-cmd` selects the flash and sends a command, `f-end` deselects, `f-adr ( lo hi -- )` sends
   a 24-bit address given as a double, `f-wait` polls status bit 0, and on top `f-read`
   (then `0 spi` per byte), `f-prog ( a n lo hi -- )` (within one page), `f-erase`,
-  `f-erase64`, `flash-id`, `crc-reset crc+ crc@`.
+  `f-erase64`, `flash-id`, `crc-reset crc+ crc@`. These keep their names: `spi` and `spi-cs`
+  are the flash's master, the serial interfaces' SPI words start with `spi-` and take a unit
+  number.
+- **Serial interfaces** (release 1.3): names and stack effects as in ZYNQ-FPGA-FORTH32, except
+  for the rates, the SPI widths and `i2c-open` (section 9.1). `uart-a ( u -- a )` and
+  `spi-a ( s -- a )` check the unit number (` bad uart`, ` bad spi`) and give its block's
+  address; the variable `cid` holds the owner id of the unit being opened.
+
+  `uart-open ( ud-baud tx rx u -- )` checks both pins, sets the divider with `uart-div`, then
+  releases and claims the pins and writes the pins register (bit 15, RX << 8, TX). Opening an
+  open UART moves it to the new pins and rate. `uart-div` computes the clocks per bit:
+
+  ```forth
+  \ clocks per bit = 48000000 / baud, rounded; both halve until the baud fits in a cell
+  : uart-div ( ud-baud u -- )
+    uart-a >r 2dup or 0= if ."  bad baud" cr abort then
+    >r >r $6C00 $02DC r> r>
+    begin dup while d2/u >r >r d2/u r> r> repeat drop
+    dup >r 1 rshift m+u r> ud/u
+    dup $FF00 and if ."  bad baud" cr abort then r@ 6 + ! r> 4 + ! ;
+  ```
+
+  `ud/u` divides by a single cell only, so the dividend (48,000,000 = `$02DC6C00`) and the
+  baud rate are halved together until the rate fits a cell; half the rate is added for
+  rounding. 115,200 Bd is halved once: (24,000,000 + 28,800) / 57,600 = 417. The bits lost in
+  halving change the divider by less than 0.01 %. 0 Bd and dividers above 24 bits (below
+  3 Bd) give ` bad baud`; above 6,000,000 Bd the hardware runs at 6 MBd (section 4.12).
+
+  `uart-emit ( c u -- )` waits for room in the TX FIFO, `uart-key ( u -- c )` for a byte, and
+  both call `service?` while they wait, so the app's requests are answered meanwhile, as in
+  `key` and `ms`:
+
+  ```forth
+  : uart-emit ( c u -- ) uart-a begin service? dup 2 + @ 2 and until ! ;
+  : uart-key ( u -- c ) uart-a begin service? dup 2 + @ 1 and until @ $FF and ;
+  ```
+
+  The `@` in `uart-key` takes the byte from the FIFO (section 3.5); `$FF and` drops the valid
+  bit 8. Further: `uart-key?`, `uart-type ( a n u -- )`, `uart-status ( u -- bits )` (bits
+  2..4 of the status register, followed by a store that clears bits 3 and 4) and
+  `uart-close` (pins register 0, pins released).
+
+  `spi-open ( sck mosi miso s -- )` takes the same three steps for three pins; it writes the
+  MISO pin to +10, then on, MOSI and SCK to +8. `spi-close` clears both registers.
+  `spi-khz ( khz s -- )` takes 1..12,000 and writes half = ⌈24,000 / khz⌉, so the clock is
+  never faster than asked (7,000 kHz gives half 4, 6 MHz). `spi-mode ( mode s -- )`,
+  `spi-lsb ( f s -- )` and `spi-bits ( n s -- )` (8 or 16, else ` bad bits`) change their bits
+  of the control register through `spi-ctl ( bits mask s -- )`. `spi-xfer ( out s -- in )`
+  stores the value and waits until busy clears; `spi-write` and `spi-read ( a n s -- )` move
+  bytes.
+
+  `i2c-open ( khz scl sda -- )` takes 1..1000 kHz, writes quarter = ⌈12,000 / khz⌉ and claims
+  both pins with owner 9. Every bus action goes through `(i2c)`:
+
+  ```forth
+  : (i2c) ( cmd -- status )
+    $80E0 ! begin $80E0 @ dup 0< while drop repeat
+    dup $200 and if ."  i2c timeout" cr abort then ;
+  : i2c-write ( b -- ack? ) $FF and $300 or (i2c) $100 and 0<> ;
+  : i2c-addr ( addr rw -- ack? ) i2c-start swap 2* or i2c-write ;
+  ```
+
+  On these sit `i2c-start`, `i2c-stop`, `i2c-read ( ack? -- b )`, `i2c! ( b reg addr -- )` and
+  `i2c@ ( reg addr -- b )` for register-style devices (with a repeated start before the read;
+  without an ACK they send a stop and abort with ` no ack`), `i2c-probe ( addr -- f )`,
+  `i2c-scan` (prints the addresses 8..119 that answer, in hex) and `i2c-close`. The waits in
+  `spi-xfer` and `(i2c)` do not call `service?`; an SPI transfer takes at most 16 ms (16 bits
+  at 1 kHz), an I2C byte at most about 30 ms (9 bits at 1 kHz and the stretching timeout).
+
+  `units-off` switches every unit that can own a pin off; `cold` runs it (section 5.6):
+
+  ```forth
+  : units-off ( -- )
+    4 0 do i pwm-off loop dds-off 2 0 do i uart-close i spi-close loop i2c-close ;
+  ```
 
 ### 5.12 Saved source and autostart
 
@@ -1275,9 +1554,10 @@ one CPU, between two bytes of Forth's own input and output.
   begin soh? while serve repeat ;
 ```
 
-`key` (through `key?`), `ms` and the wait in `emit` (while the TX FIFO is full) call
-`service?`, so answers come at the prompt and whenever a program waits in `ms`, polls `key?`,
-reads `key` or prints a lot. A word that only computes answers nothing until it ends; Ctrl-R
+`key` (through `key?`), `ms`, the wait in `emit` (while the TX FIFO is full) and, since 1.3,
+the waits in `uart-key` and `uart-emit` call `service?`, so answers come at the prompt and
+whenever a program waits in `ms`, polls `key?`, reads `key`, prints a lot or waits for a
+UART. A word that only computes answers nothing until it ends; Ctrl-R
 always works because it is hardware. A request queued behind terminal input waits until Forth
 has read that input, which is why the app sends text in pieces of at most 4 KB (chapter 8).
 
@@ -1285,7 +1565,7 @@ has read that input, which is why the app sends text in pieces of at most 4 KB (
 there is served, anything else is terminal input. An earlier `key?` called `service?` and then
 tested "a byte is waiting"; a SOH arriving between the two tests was then read by `key` as a
 terminal character, and the rest of the request ended up in the input line. The simulator
-showed that race (section 6.6).
+showed that race (section 6.8).
 
 **The guards.** `serving` keeps an answer from starting another (inside an answer `key?` is
 the raw test and `service?` returns at once). And nothing is answered while a word has the
@@ -1331,7 +1611,7 @@ uses the stored length directly and generates its payload once (`answer-n`). Ins
 | Request | Answer payload |
 |---|---|
 | `echo <word>` | the word |
-| `version` | `firmware max1000-forth 1.2`, `protocol 1`, `kernel <cells> <kcheck>` (5257 and the image's cell sum in hex, `9CB4`, set by the cross-compiler) |
+| `version` | `firmware max1000-forth 1.3`, `protocol 1`, `kernel <cells> <kcheck>` (6323 and the image's cell sum in hex, `A098`, set by the cross-compiler) |
 | `status` | `state running`, `pc 0000` (always: the PC is not readable), `input` = RX FIFO bytes (`$800E`) plus the unread rest of a saved source, `starts`, `source` (`none`, `stored` or `damaged`), `length`, `crc`, `autostart` (`on` or `off`), `last` (`none`, `fed` or `skipped`) |
 | `words` | `here <hex>`, then one line per word, newest first: execution token, flags (`-` or `i` immediate, `h` hidden, `n` inline), name |
 | `stack` | the snapshot of the last prompt: depth, then the cells bottom first in hex; `err stack busy` while `snap` copies |
@@ -1353,17 +1633,35 @@ adc 0000 0800 ... 0FFF         the 12-bit codes of ADC channels 0..8
 temp 0E38                      the temperature diode's code
 accel 0000 0000 03E8           x y z in mg, 16-bit two's complement
 dds 8009 01555555              control register, tuning word
+fn 0000 0000 8000 8001 800D 800B 800C 0000 0000 0000 0000 0000
 ```
 
-"Driven" in `ports` is the direction register ORed with the pins owned by an enabled PWM
-channel (`pwm-own`) or by the DDS (`dds-own`), so the app shows a generator's pin as an
-output. The app usually restarts with Ctrl-R (and ESC) rather than with the `restart`
-request, because Ctrl-R also works during a tight loop. There is no HASE mode on the MAX1000.
+"Driven" in `ports` is the hardware's drive register at port offset +6 (section 4.7): the
+outputs and every pin a peripheral drives at that moment, so the app shows the pin of a
+generator or a serial interface's output as an output. `port-word` just reads it:
+
+```forth
+: port-word ( p -- lo hi ) 3 lshift $8010 + dup @ swap 6 + @ ;
+```
+
+Up to release 1.2 the kernel computed the same from the PWM and DDS control registers
+(`pwm-own`, `dds-own`). The `fn` line (release 1.3) gives the pins of the serial interfaces:
+twelve hex words, UART 0 TX and RX, UART 1 TX and RX, SPI 0 SCK, MOSI and MISO, SPI 1 SCK,
+MOSI and MISO, I2C SCL and SDA, each with bit 15 = on and bits 5..0 = the pin. `fn2` splits
+a pins register into its two functions (bits 5..0 and bits 13..8, each with the on bit) and
+`fnx` prints one word; an SPI master's MISO word joins the on bit of +8 with the pin of +10.
+A closed unit shows `0000`. The example above has UART 1 on D0 (TX) and D1 (RX) and SPI 0
+on D13, D11 and D12. The app looks the lines up by name, so app 2.4.4, which does not know
+the `fn` line yet, ignores it (chapter 8).
+
+The app usually restarts with Ctrl-R (and ESC) rather than with the `restart` request,
+because Ctrl-R also works during a tight loop. There is no HASE mode on the MAX1000.
 
 ### 5.14 What is left out
 
-To keep the kernel within 10 KB of the 16 KB code space, some standard Forth is not there:
-most double-cell words (`d+`, `m*`, `*/mod`, pictured output `<# # #>`), `char`, `[char]` and
+To keep the kernel within about 12 KB of the 16 KB code space, some standard Forth is not
+there: most double-cell words (`d+`, `d.`, `m*`, `*/mod`, pictured output `<# # #>`; double
+numbers can be typed since 1.3, but not printed), `char`, `[char]` and
 `s"` at run time, `accept`, `evaluate`, `?do`, `leave`, `case`, `does>`, `postpone`, `defer`,
 `marker`, `forget`, `pick`, `roll`, `2swap`, `2over`, `fill`, `move`, `see`, `dump`.
 Chapter 7 of the [manual](Manual.md) lists the differences. Each would be some tens to a few
@@ -1373,7 +1671,7 @@ hundred bytes of Forth, in the kernel or in the saved source.
 
 ### 6.1 `tools/hf16.py`
 
-One Python file (847 lines) with two parts.
+One Python file (1,045 lines) with two parts.
 
 **The cross-compiler** (`Compiler`, section 5.1). `python tools/hf16.py build forth/kernel.fs -o
 build/forth` writes:
@@ -1387,28 +1685,34 @@ build/forth` writes:
 
 **The instruction-set simulator** (`Machine`) executes HF16 instructions as the RTL does:
 the same encodings, the same 32-entry stacks with wrap-around, the same store semantics and
-the RX pop only for op 13/14 with T = `$8000`. `python tools/hf16.py run forth/kernel.fs -i "2
-3 + ."` (or `-f file`, one line per line, CR appended) runs a session in a fraction of a
-second, which is how the kernel is developed. It models:
+the RX pop only for op 13/14 with T = `$8000` (and for op 13 with T = `$80A0` or `$80B0`, the
+UARTs). `python tools/hf16.py run forth/kernel.fs -i "2 3 + ."` (or `-f file`, one line per
+line, CR appended) runs a session in a fraction of a second, which is how the kernel is
+developed. It models:
 
 | Part | Model |
 |---|---|
-| UART | the input bytes; the TX FIFO always has room and the transmitter is always idle |
+| UART (terminal) | the input bytes; the TX FIFO always has room and the transmitter is always idle |
 | LEDs, button | the register; `--button` holds the USER button |
 | Timer | 1 ms per 100 instructions (so `ms` runs about 480 times faster than on the board) |
-| Pins | latch and direction; inputs read low except D6 (the bench button's pull-up) |
-| PWM, DDS | the registers and the pin ownership; a PWM pin reads high only at full duty, the DDS output is not modelled |
+| Pins | latch, direction and the drive register (`driven()`); inputs read low except D6 (the bench button's pull-up); `--wire A-B` joins two pins (repeatable), as a jumper wire on the header |
+| PWM, DDS | the registers and the pin ownership; a PWM pin reads high only at full duty, the DDS pin low (its output is not modelled) |
+| UART 0, 1 | class `Uart`, at the transfer level, without timing: a byte sent (`uart_send`) reaches every UART that is on and whose RX pin is joined to the TX pin (`net`; the same pin counts), as data if both dividers are equal (below 8 counting as 8), else as a framing error; 1 KB RX FIFO with overrun; the TX FIFO always has room and the transmitter is always idle; `uart_feed` delivers bytes from outside at 115,200 Bd; the TX pin reads high |
+| SPI 0, 1 | class `Spi`: a transfer (`spi_xfer16`) completes at once and reads back what it sent when MISO is joined to MOSI, else the MISO pin's level in every bit; SCK reads its idle level (CPOL), MOSI low |
+| I2C | `i2c_cmd`: `--i2c-dev ADDR` adds a 256-byte register memory at a 7-bit address (repeatable); after the address byte the first byte written sets the register pointer, which counts up with each byte; other addresses give no ACK; the devices are on the bus whatever pins the master uses, and released lines read high (pull-ups) |
 | ADC | AIN3 (CH1) = 2048 (1.65 V), AIN0 (CH8) = 4095 (3.3 V), the rest 0; temperature code 3640 (34.6 °C) |
 | LIS3DH | WHO_AM_I `$33`, x = 0, y = 0, z = 1000 mg; other registers keep what is written |
 | W25Q64 | JEDEC ID, status, write enable, read, page program (within the page), 4 KB and 64 KB erase; `--flash image` keeps the first 128 KB in a file between runs |
 | CRC | zlib's `crc32`, as the hardware |
-| SPI | an exchange completes at once (never busy) |
-| Restart | a store to `$8008` resets CPU, LEDs, pins, PWM, DDS and SPI selects and clears the RX FIFO (since 1.2, as the hardware); the RAM stays |
+| SPI (flash) | an exchange completes at once (never busy) |
+| Restart | a store to `$8008` resets CPU, LEDs, pins, PWM, DDS, the serial interfaces and the SPI selects and clears the RX FIFO (as the hardware); the RAM stays |
 
-It does not model the store hazard's undefined read (the compilers never use it), the
-Ctrl-R byte, or any timing below an instruction. A
-run ends when all input is consumed and Forth has polled the empty FIFO 2,000 times, or after
-`--steps` instructions.
+`serial_read` and `serial_store` decode the serial units' registers; everything a UART or an
+SPI master sends is logged (`uart_log`, `spi_log`) for the tests. The ISS does not model the
+store hazard's undefined read (the compilers never use it), the Ctrl-R byte, bit timing on
+the serial lines, a `c@` of a UART data register (which pops in hardware), or any timing
+below an instruction. A run ends when all input is consumed and Forth has polled the empty
+FIFO 2,000 times, or after `--steps` instructions.
 
 ### 6.2 `tools/mforth.py`
 
@@ -1431,24 +1735,77 @@ and run; `erase-source`.
 
 ### 6.4 `sim/test_protocol.py`
 
-53 checks of the service requests and the board words around them, driving the simulator
+56 checks of the service requests and the board words around them, driving the simulator
 byte by byte and splitting its output into terminal text and answers as the app does: the
 banner; `echo`; `version` (with the checksum recomputed from the image); `status`; `stack` and
-the empty stack; `words` (all 330 words, flags, a new word first); `board` at the start, with
+the empty stack; `words` (all 376 words, flags, a new word first); `board` at the start, with
 pins, PWM and LEDs, with the temperature and the accelerometer, with the DDS on pin 9 at
-1 MHz; DDS tuning words at 1 Hz and 65,535 kHz against Python; the data RAM and its end,
-`buffer:` and its alignment; no answer while the flash is selected, and `key?` false
-meanwhile instead of looping; `led-on`, `led-off`, `led-toggle`, ` bad led`, the other LEDs
-kept; the `input` count of `status`; `store` lengths 65536, 70000, 99999, `1x`, `-5` and
+1 MHz; the `fn` line at the start (twelve `0000`), with UART 1, SPI 0 and I2C open (TX, SCK
+and MOSI driven; RX, MISO and the released SCL not) and after closing them; DDS tuning words
+at 1 Hz and 65,535 kHz against Python; the data RAM and its end, `buffer:` and its
+alignment; no answer while the flash is selected, and `key?` false meanwhile instead of
+looping; `led-on`, `led-off`, `led-toggle`, ` bad led`, the other LEDs kept; the `input`
+count of `status`; `store` lengths 65536, 70000, 99999, `1x`, `-5` and
 `$100` refused; `store` (also with a wrong CRC), `source`, `restart` (also clearing the input
 queued behind it) and `restart skip` with their effect on `status`; `autostart` on, off and
 with bad arguments; `erase`; an unknown request; an answer during `ms` that comes before the
 line's ` ok`; a SOH printed by Forth arriving doubled; an unfinished request dropped after
 2 s; a 15 KB store.
 
-`scripts/Build-Release.ps1` runs both test scripts before every release build.
+### 6.5 `sim/test_serial.py`
 
-### 6.5 Checks on the board
+43 checks of the serial interfaces, the pin owners and the double numbers in the simulator,
+with jumper wires and an I2C register memory modelled as in section 6.1:
+
+- **Double numbers:** `115200.`, `65535.`, `$10000.` and `1.` interpreted and compiled; `1x.`
+  refused; single numbers unchanged.
+- **Owners:** a PWM pin refused to a second channel, released by `pwm-off` and taken again;
+  a UART refused on a PWM pin; after a refusal nothing is half claimed; the DDS moves from
+  pin to pin; `dds-off` releases; pin 15 is not a pin.
+- **UART** (D0 joined to D1): divider 417 and the pins register after `uart-open`; loopback
+  through the wire; `uart-type`; the idle status and the owners; UART 1 refused on a pin of
+  UART 0; UART 1 at 9,600 Bd (divider 5000) receiving from UART 0 at 115,200 Bd (a framing
+  error, cleared by reading `uart-status`), then at the same rate (the byte arrives);
+  ` bad baud` for 0 and 2 Bd, ` bad uart`; the dividers at 300, 57,600, 921,600, 1,000,000
+  and 3,000,000 Bd; bytes arriving from outside.
+- **SPI** (D11 joined to D12): loopback at 1 MHz; 16 bits; ` bad bits`; mode and bit order
+  in the control register; `spi-khz` rounding (7,000 kHz to half 4, 12,000 to 2, 1 to 24,000)
+  and its range; `spi-write` and `spi-read`; an open MISO reading its idle level; SPI 1
+  refused on a pin of SPI 0, and the refused re-open keeping SPI 1's old pins; closing and
+  ` bad spi`.
+- **I2C** (a register memory at `$50`): `i2c-open` at 100 kHz (quarter 120, pins, owners);
+  `i2c-probe` of a present and an absent address; `i2c!` and `i2c@`; `i2c-scan`; ` no ack`;
+  400 kHz (quarter 30) and the range; moving to other pins.
+- **Restart and `cold`:** a Ctrl-R restart clears the owners and the units; a typed `cold`
+  switches PWM, DDS, UART and SPI off and frees their pins.
+
+### 6.6 `sim/tb_serial.v` and `sim/run_serial.ps1`
+
+`sim/tb_serial.v` checks the Verilog of the three serial units, cycle by cycle at 48 MHz,
+after ZYNQ-FPGA-FORTH32's `sim/tb_periph.v`. The pin inputs pass a two-flop synchronizer as
+in the top level, and the I2C lines are open drain with a pull-up. `sim/run_serial.ps1`
+compiles and runs it in the Vivado simulator (xsim of Vivado 2023.2, given with `-Vivado`,
+found through `XILINX_VIVADO` or under `\Xilinx\Vivado\2023.2` on any drive; the units are
+plain Verilog), with its output in `build\sim_serial`. 2,016 checks:
+
+- **UART:** UART 0 sends to UART 1 all 256 byte values at 1 MBd (divider 48) and again at the
+  smallest divider (3 written, 8 used: 6 MBd); the divider registers after reset and as
+  written; an overrun after 1,024 bytes (1,030 sent without reading: the flag is set, cleared
+  by a write, and 1,024 bytes come out in order); a framing error (the receiver at twice the
+  sender's rate); switching the UART off empties its FIFO.
+- **SPI:** modes 0..3 × 8 and 16 bits × MSB and LSB first at the fastest clock (half 2,
+  12 MHz), eight transfers each, alternately a MOSI → MISO loopback and a slave model that
+  changes MISO on its shift edges (with a check of what the slave captured from MOSI); for
+  each transfer the number of SCK edges (two per bit) and the idle level of SCK.
+- **I2C:** at 400 kHz and 100 kHz against a 24Cxx-style slave model at `0x50` with an address
+  pointer, which holds SCL low for 3 µs after each ACK it gives: three bytes written, read
+  back after a repeated start with ACK, ACK and NACK; the pointer wrapping from `FF` to `00`;
+  no ACK from an absent address; the bus released after the stop.
+
+`scripts/Build-Release.ps1` runs the three simulator test scripts of sections 6.3 to 6.5
+before every release build. The testbench needs Vivado and is run on its own.
+
+### 6.7 Checks on the board
 
 - **Boot:** after `program_flash.ps1`, RESET (a reconfiguration from the internal flash)
   starts MAX1000-FORTH with the kernel image from the `.pof`.
@@ -1465,10 +1822,21 @@ line's ` ok`; a SOH printed by Forth arriving doubled; an unfinished request dro
   and 9); a word polling `key?` with the flash selected while a `board` request arrived
   counted to its end (`kq 50`), and the answer followed at `f-end`; `store` lengths 65536,
   99999 and `1x` refused.
+- **Release 1.3** (configuration loaded into the FPGA's SRAM, checks run by a script over
+  COM5): `version` answered `firmware max1000-forth 1.3` and `kernel 6323 A098`; a double
+  literal; UART 0 with TX and RX on the same pin (the pad reads back what it drives) at 9,600,
+  115,200, 1,000,000 and 3,000,000 Bd; both UARTs at once on D9 and D10; ` pin taken` and the
+  owners; SPI 0 with MOSI and MISO on D12 at 1 and 12 MHz, and 16 bits in mode 3, LSB first;
+  16 SCK edges on D13, counted with `pin@`, for one 8-bit transfer at 1 kHz; the `fn` line
+  with everything closed and with UART 1 on D0/D1 and SPI 0 on D13/D11/D12
+  (`fn 0000 0000 8000 8001 800D 800B 800C ...`); I2C on open pins without pull-ups:
+  `i2c-probe` returned 0 and Forth went on; a typed `cold` freed the pins. Not yet checked on
+  the board: I2C with a real device, and wired connections from pin to pin.
 
-### 6.6 Found on the way
+### 6.8 Found on the way
 
-The simulator and the board found these, and each is now covered by a check or a rule:
+The simulator, the board, the Quartus reports and the testbench found these, and each is now
+covered by a check or a rule:
 
 | Finding | Cause | Fix |
 |---|---|---|
@@ -1483,6 +1851,11 @@ The simulator and the board found these, and each is now covered by a check or a
 | `key?` could hang (found while writing this document) | a request at the head of the FIFO while a word kept a device selected was neither served nor passed | `key?` answers false then (1.2) |
 | the `status` length could be off by one (same) | `input` was read in each of the two passes | read once into `s-in` (1.2) |
 | a `store` length above 65535 wrapped (same) | `number?` keeps 16 bits | `dec16` refuses it (1.2) |
+| the CPU grew to 2,043 logic elements, the design to 7,553 (94 %), and the CPU clock's slack fell to 0.024 ns (1.3) | with the four UART FIFO blocks (38 of 42 M9K) Quartus built the two stacks from flip-flops; the worst path ran from `dsp` through the 32-way stack multiplexer, the multiplier and the ALU to `mem_addr`, the store decode and a PWM period register | `(* ramstyle = "M9K" *)` on `dstack` and `rstack` (section 3.7): 6,451 logic elements, 1.056 ns |
+| a refused re-open left the unit's old pins marked free while the hardware still drove them (1.3) | the open words released the unit's own pins before checking the new ones, the order of ZYNQ-FPGA-FORTH32 3.1's kernel | check all new pins, then release, then claim (section 5.11) |
+| after a typed `cold` the owner table was empty while PWM, DDS and serial units kept running (1.3) | `cold` cleared the table but did not touch the units | `cold` runs `units-off` |
+| the `fn` line still showed the MISO pin of a closed SPI master (1.3) | `spi-close` cleared only the first pins register | it clears both |
+| the testbench's UART checks failed (1.3, testbench only) | ZYNQ-FPGA-FORTH32's testbench drained the receiver after a fixed time, enough for 64-byte FIFOs; with 1 KB FIFOs the sender queues everything at once | the testbench drains until the transmitter is idle; the RTL was right |
 
 ## 7 Building, flashing and releasing
 
@@ -1513,7 +1886,8 @@ It creates the project in `build/` and compiles it:
 - `INTERNAL_FLASH_UPDATE_MODE "SINGLE IMAGE WITH ERAM"`: the configuration flash holds one
   image *with* the initial RAM contents, so the `.pof` carries the kernel;
 - `RESERVE_ALL_UNUSED_PINS_WEAK_PULLUP` as inputs with weak pull-ups;
-- the eight Verilog files of `rtl/`, the six files of the Modular ADC control core from the
+- the eleven Verilog files of `rtl/` (since 1.3 with `uart_port.v`, `spi_port.v` and
+  `i2c_port.v`), the six files of the Modular ADC control core from the
   Quartus installation (`ip/altera/altera_modular_adc/control`), the SDC file;
 - the parameters `INIT_LO` and `INIT_HI` set to the two hex files (with absolute paths);
 - all pin locations (section 2.1, 4.7);
@@ -1549,7 +1923,7 @@ repository). The serial flash with the saved source is not touched by either.
 
 ### 7.5 Releases
 
-`scripts/Build-Release.ps1 -Version 1.2` runs the two simulator test scripts, builds the
+`scripts/Build-Release.ps1 -Version 1.3` runs the three simulator test scripts, builds the
 kernel and the configuration, rewrites the manual's contents list from its headings
 (`tools/manual_contents.py`), builds `docs/Manual.pdf` and `docs/Implementation-Details.pdf`
 with `tools/manual_pdf.py` (Python `markdown` and Microsoft Edge; `-SkipPdf` uses the
@@ -1566,8 +1940,11 @@ committed PDFs) and writes `dist/MAX1000-FORTH-<version>.zip` with:
 Release **1.0** (2026-11-05) was the first: CPU, kernel, terminal, board words, saved
 source, app support. Release **1.1** (2026-11-06) added the DDS and the `dds` line of the
 `board` answer. Release **1.2** (2026-11-06) added the single-LED words and fixed the three
-kernel findings of section 6.6; its zip is the first with this document as a PDF and with
-the manual's detailed contents. All are published at
+kernel findings of section 6.8; its zip is the first with this document as a PDF and with
+the manual's detailed contents. Release **1.3** (2026-11-06) added the serial interfaces:
+two UARTs, two SPI masters and an I2C master on any pin (section 4.12), the pin-owner table,
+double-number literals, the drive register behind the `ports` line and the `fn` line of the
+`board` answer; a typed `cold` now switches the units off. All are published at
 [github.com/andiepp/MAX1000-FORTH](https://github.com/andiepp/MAX1000-FORTH).
 
 ## 8 The Windows app
@@ -1582,7 +1959,7 @@ example).
 | `ZynqForth.Core/Board/BoardModels.cs` | `BoardVersion.Kind`: the `firmware` line of the `version` answer names `max1000-forth`, so the board is a `BoardKind.Max1000` (else `Zynq`); `Product` gives "MAX1000-FORTH" for messages |
 | `ViewModels/MainViewModel.cs` | after connecting, `SetBoardKind`; for a MAX1000 it sets `client.InputWindow` = 4 KB and `client.RestartByCtrlR` = true, hides the Pattern tab (the MAX1000 has no pattern generator) and remembers the kind; the board view polls `board` every 250 ms, the status line `status` every 1.5 s |
 | `ZynqForth.Core/Board/BoardClient.cs` | `SendTextAsync` ("Run all") sends text only while `InputWindow` minus the `input` of `status` leaves at least 1 KB, so a piece is at most 4 KB and the 8 KB RX FIFO never overflows; `RestartAsync` sends Ctrl-R, or Ctrl-R and ESC for "Restart clean", instead of the `restart` request |
-| `ZynqForth.Core/Board/Max1000State.cs` | parses the `board` answer: LEDs, button, both ports (levels and driven), PWM enables and pins, the 9 ADC codes mapped to AIN0..AIN7 and AIN (the same table as the kernel's `ain`), the temperature (the same interpolation as `temp@`) and the accelerometer; the `dds` line is not decoded, but the DDS pin shows as a driven pin |
+| `ZynqForth.Core/Board/Max1000State.cs` | parses the `board` answer: LEDs, button, both ports (levels and driven), PWM enables and pins, the 9 ADC codes mapped to AIN0..AIN7 and AIN (the same table as the kernel's `ain`), the temperature (the same interpolation as `temp@`) and the accelerometer; the `dds` and `fn` lines are not decoded, but the DDS pin and the serial output pins show as driven pins |
 | `Controls/Max1000View.cs` | draws the MAX1000: 8 LEDs, the USER button, the chip temperature and the tilt in g, the PWM channels and their pins, the 23 pins (input, output high/low, PWM), bars for the 9 analog inputs in volts |
 | `Views/MainWindow.xaml.cs` | `OpenManual` (Manual button, F1): for a MAX1000 it opens the MAX1000-FORTH manual embedded in the app, written to `%LocalAppData%\ZYNQ-FORTH` |
 
@@ -1592,19 +1969,24 @@ after Forth has compiled all of it. With 4 KB pieces each answer comes quickly a
 progress display stays live. Why Ctrl-R: the `restart` request is answered only when Forth
 waits, Ctrl-R always.
 
+The current app, 2.4.4, was made for release 1.2. It looks up the lines of the `board`
+answer by name and does not read the `fn` line yet: the output pins of a serial interface
+(TX, SCK, MOSI, and SCL or SDA while pulled low) appear as plain outputs through the drive
+mask of `ports`, and its input pins as inputs, without their function.
+
 ## 9 Design decisions and room for growth
 
 ### 9.1 Decisions
 
 | Decision | Why |
 |---|---|
-| HF16 unchanged from ZYNQ-FORTH | one CPU, one instruction set, one cross-compiler and simulator for both boards; the kernel's core carries over |
+| HF16 as in ZYNQ-FORTH (one synthesis attribute added) | one CPU, one instruction set, one cross-compiler and simulator for both boards; the kernel's core carries over |
 | No soft processor; the kernel answers the app | the 10M08 has room for HF16 and the peripherals but not for a second CPU with its memory; the protocol is simple enough for Forth |
 | The kernel as the RAM's initial content | no loader, no boot time, nothing to go wrong between power-up and the banner; the cost is a Quartus build per kernel change |
 | Ctrl-R in hardware | the only way to stop a tight loop when no other processor watches the CPU |
 | I/O read multiplexer on the registered address | takes the I/O decode off the critical path: 48 MHz instead of 40, at the cost of one 16-bit register |
 | Two byte-wide RAM halves | byte stores without relying on inferred byte enables; 24 M9K either way |
-| Stacks in M9K | the MAX 10 has no LUT RAM; two M9K blocks are cheaper than 1,024 flip-flops with multiplexers |
+| Stacks in M9K, by attribute since 1.3 | the MAX 10 has no LUT RAM; two M9K blocks are cheaper than 1,024 flip-flops with multiplexers, and the attribute keeps Quartus from giving them up when the M9K get scarce |
 | 16 KB of code, 8 KB of data RAM | the 13-bit addresses of HF16 reach 16 KB; the rest of the RAM is still useful as data (`buffer:`, the kernel's buffers) |
 | 8 KB RX FIFO | flash erase times during `store`, and room for the app's 4 KB pieces |
 | Answers generated twice | no payload buffer in a 24 KB machine; fixed-width hex keeps both passes the same length |
@@ -1613,33 +1995,43 @@ waits, Ctrl-R always.
 | Four ADC conversions per channel | high-impedance sources settle; costs only conversion rate, of which there is plenty |
 | DDS on its own 192 MHz clock | 5.2 ns edge resolution and 0.045 Hz steps from a single adder; the handshake keeps the CPU side at 48 MHz |
 | Pull-ups off by default, a build option | LEDs on the bench pins; Forth cannot switch the MAX 10's pull-ups |
+| Serial interfaces after ZYNQ-FPGA-FORTH32 3.1, on the 16-bit bus | the same units and nearly the same words on both FPGA boards; the 16-bit registers split the UART divider in two, limit SPI to 8 or 16 bits (no 32) and give the MISO pin a register of its own |
+| Baud rates as double numbers, SPI and I2C rates in kHz | 115,200 or 400,000 do not fit a 16-bit cell; double literals with a trailing dot (unsigned only) make `115200.` typeable, and kHz keeps the SPI and I2C rates in one cell |
+| 1 KB UART FIFOs in M9K | the MAX 10 has no LUT RAM: a 64-byte FIFO in flip-flops would cost several hundred logic elements, and an M9K holds 1 KB anyway |
+| `i2c-open` takes its pins | the MAX1000 has no dedicated SCL and SDA pins |
+| A pin-owner table in data RAM | one owner per pin, checked before anything changes, so a pin is never driven by two units; 32 bytes of the free buffer area and no code space |
+| The drive register at port +6 | the `board` answer reads what the hardware drives instead of working it out in Forth from 13 control registers |
+| Word names and stack effects as in ZYNQ-FPGA-FORTH32 | sources move between the boards; the exceptions are the rates (`uart-open`'s double baud rate, `spi-khz` instead of `spi-hz`, I2C in kHz), `spi-bits` (8 or 16) and `i2c-open ( khz scl sda -- )`, which takes its pins (ZYNQ-FPGA-FORTH32: `i2c-open ( hz -- )` on the shield's SCL and SDA pins, `i2c-open-pins ( hz scl sda -- )`) |
 
 ### 9.2 Room for growth
 
-The 1.2 design leaves, of the 10M08:
+The 1.3 design leaves, of the 10M08:
 
-- **Logic:** 3,805 logic elements free (47 %). The four PWM channels alone use 1,734; a fifth
-  peripheral of the DDS's size (150 logic elements) fits many times over.
-- **Block RAM:** 6 M9K free (6 KB as byte-wide memory). Enough for bigger FIFOs, a small
-  second buffer, a UART or SPI peripheral's FIFOs, or a deeper return stack.
+- **Logic:** 1,613 logic elements free (20 %). The four PWM channels use 1,753, the serial
+  interfaces about 2,200; a unit of the DDS's size (about 140 logic elements) still fits
+  several times.
+- **Block RAM:** 2 M9K free (2 KB as byte-wide memory). Enough for a bigger FIFO or a deeper
+  return stack, not for much more.
 - **Multipliers:** 30 of 48 9-bit elements free.
 - **PLL:** 2 of 5 outputs free, for another clock domain.
 - **UFM:** the user flash block inside the MAX 10 is unused.
-- **Code space:** 5,870 bytes for typed words; the missing Forth words (section 5.14) would fit
-  in the kernel at some tens to hundreds of bytes each.
-- **Data RAM:** 7,168 bytes for `buffer:`, plus 224 unused bytes among the kernel's buffers.
+- **Code space:** 3,738 bytes for typed words; the missing Forth words (section 5.14) would fit
+  in the kernel at some tens to hundreds of bytes each, but not all of them.
+- **Data RAM:** 7,168 bytes for `buffer:`, plus 192 unused bytes among the kernel's buffers.
 - **Pins:** the header's analog pins are taken by the ADC; all 23 digital pins and the Pmod
-  are in use as GPIO, and each can carry a PWM channel or the DDS.
+  are in use as GPIO, and each can carry a PWM channel, the DDS or a signal of a serial
+  interface.
 
-Natural extensions that need no change to what exists: more PWM channels or DDS outputs, a
-UART or I²C master routed to any pin (as in ZYNQ-FPGA-FORTH32), a pin ownership table in the
-kernel, and decoding of the `dds` line in the app.
+Natural extensions that need no change to what exists: decoding of the `dds` and `fn` lines
+in the app, and words for particular devices (sensors, displays, memories) written in Forth
+on top of the `uart-`, `spi-` and `i2c-` words, in the saved source. A further hardware unit
+has to fit into the remaining 1,600 logic elements and 2 M9K.
 
 ### 9.3 What would not fit
 
 - **More than 16 KB of code.** The PC and the branch targets are 13-bit word addresses; more
   code space means a different instruction format, a different CPU.
-- **More RAM.** 24 KB uses 24 of the 42 M9K; 32 KB would need 8 more, and only 6 are free.
+- **More RAM.** 24 KB uses 24 of the 42 M9K; 32 KB would need 8 more, and only 2 are free.
 - **HF32.** The 32-bit CPU of ZYNQ-FPGA-FORTH32, with its FPU and divider, takes 8,321 of
   the Zynq's 6-input LUTs, more than the whole 10M08 offers in 4-input logic elements.
 - **The pattern generator** of the Zynq designs: its 4,096 × 80-bit pattern memory alone is

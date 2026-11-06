@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.3 — 2026-11-06
+
+- **Serial interfaces on any pin** (after ZYNQ-FPGA-FORTH32 3.1): two UARTs (8N1, 3 Bd to
+  6 MBd, 1 KB receive and send buffers), two SPI masters (modes 0..3, 8 or 16 bits, MSB or
+  LSB first, up to 12 MHz) and an I2C master (1..1000 kHz, open drain, clock stretching).
+  Words: `uart-open` `uart-close` `uart-emit` `uart-type` `uart-key?` `uart-key`
+  `uart-status`, `spi-open` `spi-close` `spi-khz` `spi-mode` `spi-lsb` `spi-bits` `spi-xfer`
+  `spi-write` `spi-read`, `i2c-open` `i2c-close` `i2c!` `i2c@` `i2c-probe` `i2c-scan`
+  `i2c-start` `i2c-stop` `i2c-addr` `i2c-write` `i2c-read`. Registers at 0x80A0..0x80E4.
+- **Double numbers** can be typed with a trailing dot (`115200.`, unsigned); the baud rate of
+  `uart-open` is one. SPI and I2C take their clock in kHz.
+- **Pin owners:** a pin belongs to one PWM channel, the DDS or one serial interface at a time;
+  another one gets ` pin taken` (in 1.2 two PWM channels, or PWM and DDS, on one pin were
+  ORed). `owner ( pin -- id )` tells who has it. The open words check all their pins first, so
+  a refused one changes nothing.
+- `cold` typed at the prompt now switches PWM, DDS and the serial interfaces off (Ctrl-R and a
+  restart always did); the pins keep their state.
+- Port register +6 (`$8016`, `$801E`) reads the pins driven now; the `board` answer takes the
+  driven pins from it and has a new last line, `fn`, with the pins of the serial interfaces.
+- The CPU's stacks are kept in M9K explicitly (a `ramstyle` attribute): without it, Quartus
+  built them from logic once the UART buffers took four more M9K blocks, and the CPU clock
+  lost almost all its timing margin.
+- The simulator models the serial interfaces per transfer (`--wire A-B` joins pins,
+  `--i2c-dev ADDR` adds an I2C register memory); new tests `sim/test_serial.py` (43 checks)
+  and the Verilog testbench `sim/tb_serial.v` (`sim/run_serial.ps1`, 2,016 checks).
+- The FPGA uses 6,451 of 8,064 logic elements (1.2: 4,259) and 40 of 42 M9K blocks; the
+  kernel has 376 words, 12,646 bytes, and leaves 3,738 bytes of code space for your words
+  (1.2: 5,870).
+- **Docs:** manual section 5.15 (serial interfaces) and examples in 6.5; the implementation
+  details describe the new units, the pin router and the tests.
+
 ## 1.2 — 2026-11-06
 
 - **Single LEDs:** `led-on`, `led-off` and `led-toggle ( n -- )` switch LED n (1..8) and

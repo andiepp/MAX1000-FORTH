@@ -30,7 +30,8 @@ set_global_assignment -name RESERVE_ALL_UNUSED_PINS_WEAK_PULLUP "AS INPUT TRI-ST
 # RAM contents (the kernel) must be part of the flash image
 set_global_assignment -name INTERNAL_FLASH_UPDATE_MODE "SINGLE IMAGE WITH ERAM"
 
-foreach f {max1000_forth.v hf16_cpu.v fifo_bram.v uart.v pwm.v adc_scan.v spi_flash.v dds.v} {
+foreach f {max1000_forth.v hf16_cpu.v fifo_bram.v uart.v pwm.v adc_scan.v spi_flash.v dds.v
+           uart_port.v spi_port.v i2c_port.v} {
     # (spi_flash.v drives the serial flash and the LIS3DH accelerometer)
     set_global_assignment -name VERILOG_FILE [file join $root rtl $f]
 }

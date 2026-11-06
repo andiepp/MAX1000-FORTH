@@ -97,7 +97,7 @@ image = b.comp.mem
 kc = b.comp.lookup('kcheck')['xt'] + 4
 total = (sum(image[a] | image[a + 1] << 8 for a in range(0, b.comp.dp, 2))
          - (image[kc] | image[kc + 1] << 8)) & 0xFFFF
-check('version', head[:2] == ['ok', 'version'] and v['firmware'] == ['max1000-forth', '1.2']
+check('version', head[:2] == ['ok', 'version'] and v['firmware'] == ['max1000-forth', '1.3']
       and v['protocol'] == ['1'] and v['kernel'][0] == str(b.comp.dp // 2)
       and int(v['kernel'][1], 16) == total, pl)
 
@@ -131,6 +131,7 @@ check('board at start', bd['board'] == ['00000001'] and bd['pwm'] == ['00000000'
 
 check('board: temperature and acceleration', bd.get('temp') == ['0E38']
       and bd.get('accel') == ['0000', '0000', '03E8'], pl)
+check('board: no pin functions at start', bd.get('fn') == ['0000'] * 12, pl)
 
 # 24 KB RAM: data RAM up to 0x5FFF, stores above it are ignored; BUFFER: hands out data RAM
 term = b.type('$5BFE @ . 1234 $5BFE ! $5BFE @ . 99 $6000 ! $6000 @ .')
@@ -197,6 +198,18 @@ t1, t2 = (2**32 + 96 * 10**6) // (192 * 10**6), (65535000 * 2**32 + 96 * 10**6) 
 lo = t2 & 0xFFFF
 lo = lo - 0x10000 if lo & 0x8000 else lo          # `.` prints cells signed
 check('DDS tuning at 1 Hz and 65535 kHz', f'{t1} {t2 >> 16} {lo}' in term, (term, t1, t2))
+
+# pin functions of the serial interfaces; their output pins show as driven
+b.type('115200. 0 1 1 uart-open 13 11 12 0 spi-open 100 14 16 i2c-open')
+head, pl = one(b.request('board')[1])
+bd = lines(pl)
+drv = int(bd['ports'][0], 16) >> 16
+check('board: pin functions', bd.get('fn') == ['0000', '0000', '8000', '8001', '800D', '800B',
+      '800C', '0000', '0000', '0000', '800E', '8010']
+      and drv & 0x2801 == 0x2801 and drv & 0x5002 == 0, pl)
+b.type('1 uart-close 0 spi-close i2c-close')
+head, pl = one(b.request('board')[1])
+check('board: pin functions closed', lines(pl).get('fn') == ['0000'] * 12, pl)
 
 text = b': hi 42 ;\r'
 crc = zlib.crc32(text)

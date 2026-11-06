@@ -8,14 +8,14 @@ the Forth kernel is part of the FPGA configuration, and Forth talks directly ove
 board's USB serial port, where the **ZYNQ-FORTH app** or any terminal program talks to it.
 
 Besides the board's 8 LEDs and its user button, Forth reaches the 23 digital pins of the
-Arduino-style header and the Pmod header, with four PWM channels and a DDS square-wave
-generator, the 9 analog inputs and
+Arduino-style header and the Pmod header, with four PWM channels, a DDS square-wave
+generator, two UARTs, two SPI masters and an I2C master on any of them, the 9 analog inputs and
 the temperature diode of the MAX 10's built-in converter, the board's LIS3DH
 **accelerometer**, and its 8 MB **serial flash**, which also keeps one Forth source that runs
 at every start.
 
 This manual covers how to use the system, how the implementation works, and every word in
-the kernel. It describes MAX1000-FORTH 1.2. For the hardware details (I/O map, pins, ADC
+the kernel. It describes MAX1000-FORTH 1.3. For the hardware details (I/O map, pins, ADC
 channels, service requests), see [design.md](design.md).
 
 Contents:
@@ -64,25 +64,27 @@ Contents:
   - [5.12 Analog inputs and temperature](#512-analog-inputs-and-temperature)
   - [5.13 PWM](#513-pwm)
   - [5.14 DDS square-wave generator](#514-dds-square-wave-generator)
-  - [5.15 Accelerometer](#515-accelerometer)
-  - [5.16 Serial flash](#516-serial-flash)
-  - [5.17 Saved source](#517-saved-source)
-  - [5.18 Defining words](#518-defining-words)
-  - [5.19 Control structures](#519-control-structures)
-  - [5.20 Compiler and execution](#520-compiler-and-execution)
-  - [5.21 Comments](#521-comments)
-  - [5.22 Interpreter and system](#522-interpreter-and-system)
-  - [5.23 Variables and constants used by the system](#523-variables-and-constants-used-by-the-system)
-  - [5.24 Internal words](#524-internal-words)
+  - [5.15 Serial interfaces: UART, SPI, I2C](#515-serial-interfaces-uart-spi-i2c)
+  - [5.16 Accelerometer](#516-accelerometer)
+  - [5.17 Serial flash](#517-serial-flash)
+  - [5.18 Saved source](#518-saved-source)
+  - [5.19 Defining words](#519-defining-words)
+  - [5.20 Control structures](#520-control-structures)
+  - [5.21 Compiler and execution](#521-compiler-and-execution)
+  - [5.22 Comments](#522-comments)
+  - [5.23 Interpreter and system](#523-interpreter-and-system)
+  - [5.24 Variables and constants used by the system](#524-variables-and-constants-used-by-the-system)
+  - [5.25 Internal words](#525-internal-words)
 - **[6. Examples](#6-examples)**
   - [6.1 LEDs and the user button](#61-leds-and-the-user-button)
   - [6.2 Digital pins](#62-digital-pins)
   - [6.3 Analog inputs, temperature and accelerometer](#63-analog-inputs-temperature-and-accelerometer)
   - [6.4 PWM and DDS](#64-pwm-and-dds)
-  - [6.5 A buffer in the data RAM](#65-a-buffer-in-the-data-ram)
-  - [6.6 Data in the serial flash](#66-data-in-the-serial-flash)
-  - [6.7 The bench demo: examples/bench.fs](#67-the-bench-demo-examplesbenchfs)
-  - [6.8 An application that starts with the board](#68-an-application-that-starts-with-the-board)
+  - [6.5 Serial interfaces](#65-serial-interfaces)
+  - [6.6 A buffer in the data RAM](#66-a-buffer-in-the-data-ram)
+  - [6.7 Data in the serial flash](#67-data-in-the-serial-flash)
+  - [6.8 The bench demo: examples/bench.fs](#68-the-bench-demo-examplesbenchfs)
+  - [6.9 An application that starts with the board](#69-an-application-that-starts-with-the-board)
 - **[7. Differences from standard Forth](#7-differences-from-standard-forth)**
 - **[8. Changing the kernel](#8-changing-the-kernel)**
 - **[9. Troubleshooting](#9-troubleshooting)**
@@ -119,7 +121,7 @@ release, or the repository. Commands run in that folder.
    | `firmware\max1000_forth.sof` | the same configuration for the FPGA only, until power-off |
    | `firmware\program_flash.ps1` | writes one of the two to the board |
    | `tools\mforth.py` | sends lines and files, saves a source in the flash |
-   | `examples\` | Forth examples (`bench.fs`, section 6.7) |
+   | `examples\` | Forth examples (`bench.fs`, section 6.8) |
    | `docs\` | this manual (`Manual.pdf`) and `design.md` |
    | `README.md`, `LICENSE`, `CHANGELOG.md` | |
 
@@ -210,7 +212,7 @@ The app is a small development environment for the HF16 on Windows:
 
 ![The ZYNQ-FORTH app with the MAX1000 running examples/bench.fs](images/app-max1000.png)
 
-*The IDE dark skin after **Run all** of `examples/bench.fs` and `bench` (section 6.7): the
+*The IDE dark skin after **Run all** of `examples/bench.fs` and `bench` (section 6.8): the
 potentiometer on AIN3 stands at about 2.5 V, so LED1 to LED6 are lit and PWM channel 0
 drives D3; D4 and D5 are outputs at 0, and a status line comes every 500 ms.*
 
@@ -338,7 +340,7 @@ kernel starts, at power-up, after RESET and after every restart, as if it were t
   a source is stored.
 
 A saved source should end at the prompt. Its last line may start an application that runs
-until a key is pressed (section 6.8); one that loops for ever, or waits for `key`, holds
+until a key is pressed (section 6.9); one that loops for ever, or waits for `key`, holds
 Forth at every start. To get past it, **hold the USER button** while you press RESET or
 restart, or click **Restart clean**; then switch the autostart off or erase the source.
 
@@ -353,11 +355,13 @@ board as Forth sees it, read several times a second:
   output driving 1 or 0, or a pin owned by a PWM channel (marked `~` and the channel
   number). Open inputs have no pull-ups and may show either level (section 5.11);
 - which PWM channels are on, and their pins (*PWM0 → D3*). A pin the DDS drives shows as an
-  output (section 5.14);
+  output (section 5.14), and so do the output pins of the serial interfaces (TX, SCK, MOSI;
+  an I2C line only while it is pulled low). The app does not name the serial functions yet;
+  the `board` answer carries them (section 4.8);
 - the **analog inputs** AIN0..AIN7 and AIN as bars with their voltage, 0 to 3.3 V
   (section 5.12);
 - the chip **temperature** and the **tilt** from the accelerometer in g (x, y, z), with an
-  app newer than 2.4 (sections 5.12 and 5.15).
+  app newer than 2.4 (sections 5.12 and 5.16).
 
 The view only reads: Forth's I/O is never changed by it. It is updated only while Forth
 answers (section 2.3).
@@ -424,9 +428,13 @@ Forth tries to read it as a number. If that fails too, it is an error.
 | `$2A` | 42 (hex regardless of `base`) |
 | `-$2A` | −42 |
 | `2A` after `hex` | 42 |
+| `115200.` | a double number: 49664 and 1 (115200 = 1 × 65536 + 49664), two cells |
+| `$1C200.` | the same in hex |
 
 Numbers are 16 bits. Larger numbers wrap around silently: `70000 .` prints `4464`
-(70000 − 65536).
+(70000 − 65536). A number with a **trailing dot** is an unsigned **double number**, two cells
+with the high cell on top (`ud`, 0..4,294,967,295); the baud rate of `uart-open` is one
+(section 5.15). A minus sign is not allowed there.
 
 ### 3.3 Stack notation
 
@@ -443,7 +451,7 @@ and leaves `c`.
 | `c` | character or byte (0..255) |
 | `a`, `addr` | byte address |
 | `ud` | unsigned double number, two cells: low cell, then the high cell on top |
-| `lo hi` | a 24-bit flash address: `lo` = bits 15..0, `hi` = bits 23..16 (section 5.16) |
+| `lo hi` | a 24-bit flash address: `lo` = bits 15..0, `hi` = bits 23..16 (section 5.17) |
 | `xt` | execution token (address of a word's code) |
 | `h` | header address of a dictionary entry |
 | `"name"` | a name that follows in the input line |
@@ -459,7 +467,13 @@ and leaves `c`.
 | ` bad pin` | a pin word got a number that is not a pin (section 5.11) | data stack cleared |
 | ` bad input` | `adc@` or `mv@` got an input above 8 (section 5.12) | data stack cleared |
 | ` bad channel` | a PWM word got a channel above 3 (section 5.13) | data stack cleared |
-| ` bad frequency` | `pwm-hz` got 0, `pwm-khz` a value outside 1..24000 | data stack cleared |
+| ` bad frequency` | `pwm-hz` got 0, `pwm-khz` a value outside 1..24000, `spi-khz` one outside 1..12000, `i2c-open` one outside 1..1000 | data stack cleared |
+| ` pin taken` | a PWM channel, the DDS or a serial interface was to get a pin another one has (section 5.15) | data stack cleared, nothing changed |
+| ` bad uart`, ` bad spi` | a UART number other than 0 and 1, an SPI number other than 0 and 1 | data stack cleared |
+| ` bad baud` | `uart-open` got 0 or less than 3 Bd | data stack cleared |
+| ` bad bits` | `spi-bits` got a width other than 8 and 16 | data stack cleared |
+| ` no ack` | the I2C device did not acknowledge in `i2c!` or `i2c@` (wrong address, no device, no pull-ups); a stop was sent | data stack cleared |
+| ` i2c timeout` | SCL stayed low for 22 ms (a device stretching too long, or no pull-up on SCL) | data stack cleared |
 | ` data RAM full` | `buffer:` asked for more than `unused-data` (section 5.7) | data stack cleared |
 
 After an error, Forth discards the rest of the line, clears the data stack and returns to
@@ -473,7 +487,7 @@ that pushes more than 28 items wraps the stack pointer around, and this is repor
 underflow.
 
 A few words report a problem without an error: `autostart` prints ` no saved source`, and
-`store` ` store timeout` or ` store failed` (section 5.17). They leave the rest of the line
+`store` ` store timeout` or ` store failed` (section 5.18). They leave the rest of the line
 running.
 
 ---
@@ -493,6 +507,7 @@ running.
    ├─ 23 digital pins: D0..D14, PIO_01..PIO_08
    ├─ PWM: 4 channels on any pin
    ├─ DDS: square wave on any pin, 192 MHz clock
+   ├─ 2 UARTs, 2 SPI masters, I2C master: any pin
    ├─ ADC: AIN, AIN0..AIN7, temperature diode
    ├─ SPI: serial flash (8 MB), LIS3DH accelerometer
    └─ CRC-32 unit
@@ -504,11 +519,12 @@ has loaded its configuration. The serial port is connected straight to the CPU's
 
 | Part | File |
 |---|---|
-| HF16 CPU (from ZYNQ-FORTH, unchanged) | `rtl/hf16_cpu.v` |
+| HF16 CPU (from ZYNQ-FORTH; only a RAM-style hint for the stacks added) | `rtl/hf16_cpu.v` |
 | Top level: PLL, RAM, UART, I/O registers, pins | `rtl/max1000_forth.v` |
 | UART and its FIFOs | `rtl/uart.v`, `rtl/fifo_bram.v` |
 | PWM (from ZYNQ-FORTH) | `rtl/pwm.v` |
 | DDS square-wave generator | `rtl/dds.v` |
+| UART, SPI master, I2C master for the pins (after ZYNQ-FPGA-FORTH32) | `rtl/uart_port.v`, `rtl/spi_port.v`, `rtl/i2c_port.v` |
 | ADC scanner around Intel's Modular ADC core | `rtl/adc_scan.v` |
 | SPI master (flash, accelerometer) and CRC-32 unit | `rtl/spi_flash.v` |
 | Forth kernel, written in Forth | `forth/kernel.fs` |
@@ -542,10 +558,10 @@ The instruction encoding is described in ZYNQ-FORTH's `docs/design.md`; it is th
 | Address | Content |
 |---|---|
 | `$0000` | jump to `cold` (start-up) |
-| `$0002`–`$2911` | the kernel: 330 words with their headers and variables |
-| `$2912`–`$3FFF` | free for your definitions (5,870 bytes). `here` shows the next free byte, `unused` how much is left |
+| `$0002`–`$3165` | the kernel: 376 words with their headers and variables |
+| `$3166`–`$3FFF` | free for your definitions (3,738 bytes). `here` shows the next free byte, `unused` how much is left |
 | `$4000`–`$5BFF` | data RAM for `buffer:` (7,168 bytes); `unused-data` shows how much is left |
-| `$5C00`–`$5FFF` | the kernel's buffers (below; `$5E20`–`$5EFF` is not used) |
+| `$5C00`–`$5FFF` | the kernel's buffers (below; `$5E40`–`$5EFF` is not used) |
 | `$6000`–`$7FFF` | no RAM; stores there are ignored |
 | `$8000`–`$80FF` | I/O registers (below); they repeat every 256 bytes up to `$FFFF` |
 
@@ -564,6 +580,7 @@ The kernel's buffers:
 | `$5DA0`–`$5DDF` | `sbuf` | `.s` parks the stack here |
 | `$5DE0`–`$5E07` | `ssnap` | the stack at the last prompt, for the app |
 | `$5E10`–`$5E1F` | `hdr` | the saved source's header |
+| `$5E20`–`$5E3F` | `pin-owner` | the owner of each pin (section 5.15) |
 | `$5F00`–`$5FFF` | `lbuf` | the piece of saved source being interpreted |
 
 The I/O registers can also be read and written directly with `@` and `!`:
@@ -581,6 +598,7 @@ The I/O registers can also be read and written directly with `@` and `!`:
 | `$8010`, `$8018` | port 0, 1: pin levels | – |
 | `$8012`, `$801A` | port 0, 1: output latch | output latch |
 | `$8014`, `$801C` | port 0, 1: direction, 1 = output | direction |
+| `$8016`, `$801E` | port 0, 1: pins driven now (outputs and the pins of PWM, DDS and serial interfaces) | – |
 | `$8020` | SPI: the byte received last | SPI: send a byte (starts an exchange) |
 | `$8022` | bit 0 = flash selected, bit 1 = busy, bit 2 = accelerometer selected | bit 0 = select the flash, bit 1 = select the accelerometer |
 | `$8024` | – | reset the CRC |
@@ -589,9 +607,12 @@ The I/O registers can also be read and written directly with `@` and `!`:
 | `$8040`–`$8052` | ADC channels 0..8 and the temperature diode (slot 9), 12 bits | – |
 | `$8060`–`$8064` | DDS: tuning low, high, control (section 5.14) | DDS registers |
 | `$8080`–`$809E` | PWM channels 0..3 (section 5.13) | PWM registers |
+| `$80A0`–`$80B8` | UART 0, 1 (section 5.15) | UART registers |
+| `$80C0`–`$80DA` | SPI 0, 1 (section 5.15) | SPI registers |
+| `$80E0`–`$80E4` | I2C (section 5.15) | I2C registers |
 
-Section 5.11 explains the ports, 5.12 the ADC, 5.13 the PWM registers, 5.14 the DDS and 5.16
-the SPI and CRC registers.
+Section 5.11 explains the ports, 5.12 the ADC, 5.13 the PWM registers, 5.14 the DDS, 5.15 the serial interfaces and
+5.17 the flash SPI and CRC registers.
 
 ### 4.4 Dictionary entries
 
@@ -647,20 +668,21 @@ which jumps to `cold`.
 
 **Ctrl-R.** The serial receiver catches the byte 0x12 (Forth never sees it) and resets the
 CPU, both serial FIFOs (typed-ahead input is discarded), the LEDs, the pins (all inputs
-again), the PWM channels and the DDS. The RAM keeps its contents, and the CPU starts at address 0
+again), the PWM channels, the DDS and the serial interfaces. The RAM keeps its contents, and the CPU starts at address 0
 again. A program can do the same by writing any value to `$8008`. The millisecond counter
 keeps running.
 
 **`cold`** then makes Forth fresh: it restores `here` and `latest` from `dp0` and `latest0`,
 so the dictionary is the kernel's again, frees the data RAM, counts the start, switches the
-accelerometer on (`accel-on`), sets `base` to 10, prints the banner, switches LED1 on, runs
+accelerometer on (`accel-on`), switches the PWM channels, the DDS and the serial interfaces off
+and frees their pins (`units-off`), sets `base` to 10, prints the banner, switches LED1 on, runs
 the saved source if autostart is on (`autoload`, section 4.7) and enters `quit`, the
 interpreter loop. `quit` copies the data stack for the app's stack view (`snap`), reads a
 line (`accept-line`), interprets it (`interpret`), prints ` ok`, and repeats.
 
 Typing `cold` (or `0 execute`) runs the same word without the hardware reset: the
-dictionary is reset and the saved source runs again, but the pins, LEDs, PWM channels and the DDS keep
-their state.
+dictionary is reset and the saved source runs again, but the pins keep their state
+(the PWM channels, the DDS and the serial interfaces are switched off).
 
 ### 4.7 The saved source (autostart)
 
@@ -676,7 +698,7 @@ With autostart on, `cold` feeds it to Forth at power-up, after RESET and after e
 restart, exactly as if it were typed: the definitions are compiled and the commands run.
 Its lines are not echoed and get no ` ok` (only the last one, which becomes the first prompt); only what they print appears. The words it
 defines are there when the first prompt comes, and its last line may start an application
-(section 6.8). The kernel itself is never changed, so a faulty source cannot break the
+(section 6.9). The kernel itself is never changed, so a faulty source cannot break the
 start for good:
 
 - **ESC within 200 ms** of the start skips it. The app's *Restart clean* and
@@ -713,10 +735,10 @@ twice, so the app can tell it from the start of an answer; a terminal program sh
 
 | Request | Answer |
 |---|---|
-| `version` | `firmware max1000-forth 1.2`, `protocol 1`, `kernel <cells> <checksum>` |
+| `version` | `firmware max1000-forth 1.3`, `protocol 1`, `kernel <cells> <checksum>` |
 | `status` | state, receive FIFO bytes, starts, the saved source's state, length, CRC, autostart, and whether it ran at the last start |
 | `stack`, `words` | the data stack at the last prompt; the dictionary |
-| `board` | LEDs and button, both pin ports with their directions and PWM/DDS owners, PWM channels, the 9 ADC codes, the temperature code, the accelerometer and the DDS (control and tuning) |
+| `board` | LEDs and button, both pin ports with the pins driven now, PWM channels, the 9 ADC codes, the temperature code, the accelerometer, the DDS (control and tuning) and the pin functions of the serial interfaces (`fn`: UART0 TX, RX, UART1 TX, RX, SPI0 SCK, MOSI, MISO, SPI1 SCK, MOSI, MISO, I2C SCL, SDA; bit 15 = on, bits 5..0 = the pin) |
 | `source`, `store`, `erase`, `autostart on\|off` | the saved source |
 | `echo`, `restart [skip]` | a test echo; a restart |
 
@@ -726,8 +748,8 @@ The details are in [design.md](design.md). There is no HASE mode on the MAX1000.
 
 ## 5. Word reference
 
-The kernel has 330 words. About a third of them are internal: they serve the interpreter,
-the compiler, the saved source and the app's requests (sections 5.23 and 5.24). Where a
+The kernel has 376 words. About a third of them are internal: they serve the interpreter,
+the compiler, the saved source and the app's requests (sections 5.24 and 5.25). Where a
 word differs from standard Forth, its entry says so.
 
 ### 5.1 Data stack
@@ -868,7 +890,7 @@ New definitions and data are added at `here`, the next free byte of the code spa
 | `buffer: name` | `( n "name" -- )` | Reserve n bytes of data RAM (rounded up to even, so cells stay aligned); `name` then pushes their address. ` data RAM full` if fewer than n bytes are left. |
 | `unused-data` | `( -- n )` | Free data RAM in bytes. |
 
-A fresh kernel leaves 5,870 bytes of code space and 7,168 bytes of data RAM. `buffer:`
+A fresh kernel leaves 3,738 bytes of code space and 7,168 bytes of data RAM. `buffer:`
 rounds odd sizes up, so every buffer starts at an even address. The data RAM is not cleared, and a restart frees all of it, together with the
 words that named the buffers.
 
@@ -969,6 +991,7 @@ its output latch, which starts low.
 | `pin` | `( n -- mask a )` | Bit mask and port address of pin n; ` bad pin` for numbers that are not pins. |
 | `bset` | `( mask a -- )` | Set the mask bits in the cell at a (a general helper). |
 | `bclr` | `( mask a -- )` | Clear the mask bits in the cell at a. |
+| `owner` | `( n -- id )` | Who has pin n (section 5.15): 0 = nobody (the pin follows its latch and direction), 1..4 = PWM channel 0..3, 5, 6 = UART 0, 1, 7, 8 = SPI 0, 1, 9 = I2C, 10 = DDS. |
 
 `high` and `low` work on inputs too: they only set the latch. Setting the level first and
 then calling `output` makes the pin start at that level without a short glitch.
@@ -995,7 +1018,8 @@ through two flip-flops.
 
 **Whole ports.** The pins are bits of two 16-bit ports. Pin n is bit n mod 16 of port
 n / 16. Each port has three registers: pin levels at `$8010 + 8p`, the output latch at
-`$8012 + 8p`, and the direction at `$8014 + 8p` (1 = output). Writing whole ports
+`$8012 + 8p`, and the direction at `$8014 + 8p` (1 = output); a fourth, `$8016 + 8p`, reads
+which pins are driven now, by their latch or by a peripheral. Writing whole ports
 changes several pins at once:
 
 ```
@@ -1059,7 +1083,7 @@ computes or waits for input. Each channel drives **any digital pin** (section 5.
 
 | Word | Stack | Description |
 |---|---|---|
-| `pwm-pin` | `( pin ch -- )` | Route channel ch to the pin and start it. The pin becomes an output driven by the channel; ` bad pin` for numbers that are not pins. |
+| `pwm-pin` | `( pin ch -- )` | Route channel ch to the pin and start it. The pin becomes an output driven by the channel; ` bad pin` for numbers that are not pins, ` pin taken` if another channel, the DDS or a serial interface has it. A channel that had another pin lets it go. |
 | `pwm-off` | `( ch -- )` | Stop the channel. Its pin returns to its own latch and direction (an input after start-up). |
 | `pwm-hz` | `( u ch -- )` | Frequency in Hz, 1..65535; ` bad frequency` for 0. |
 | `pwm-khz` | `( u ch -- )` | Frequency in kHz, 1..24000; ` bad frequency` outside. |
@@ -1087,8 +1111,8 @@ period, and the pulse is a whole number of clocks: at 1 kHz (48,000 clocks) the 
 set to about 0.002 %, at 1 MHz (48 clocks) only in steps of about 2 %. For a fine duty
 cycle, keep the frequency well below 1 MHz.
 
-Two channels on the same pin are combined (OR). The pin's level can be read with `pin@`
-like any output.
+A pin belongs to one channel at a time (section 5.15). The pin's level can be read with
+`pin@` like any output.
 
 **Checking it without an instrument.** A PWM pin filtered by a resistor and a capacitor
 (10 kΩ from the pin to an analog input, 1 µF from that input to GND) gives a DC voltage of
@@ -1118,7 +1142,7 @@ the output. It drives **any digital pin**, like a PWM channel, and runs on its o
 | `dds-hz` | `( u -- )` | Frequency in Hz, 0..65535. |
 | `dds-khz` | `( u -- )` | Frequency in kHz, 0..65535 (up to 65.5 MHz). |
 | `dds-tuning` | `( ud -- )` | The phase step directly: f = ud × 192 MHz / 2³² (low cell, then high cell). |
-| `dds-pin` | `( pin -- )` | Route the DDS to the pin and start it at phase 0; ` bad pin` for numbers that are not pins. |
+| `dds-pin` | `( pin -- )` | Route the DDS to the pin and start it at phase 0; ` bad pin` for numbers that are not pins, ` pin taken` if a PWM channel or a serial interface has it. |
 | `dds-off` | `( -- )` | Stop it; the pin returns to its own latch and direction. |
 | `dds-sync` | `( -- )` | Wait until the generator has taken over the last change (the others do this themselves). |
 
@@ -1138,7 +1162,7 @@ dds-off
 
 `dds-hz` and `dds-khz` compute the phase step hz × 2³² / 192,000,000 = hz × 2²⁰ / 46875 by
 long division, 16 bits at a time with `um/mod`, and round it (`(dds-hz) ( ud -- )` takes the
-frequency in Hz as a double number; `dds-d` is the constant 46875). The DDS and a PWM channel on the same pin are ORed. The
+frequency in Hz as a double number; `dds-d` is the constant 46875). The
 DDS registers are at `$8060`:
 
 | Address | Register |
@@ -1151,7 +1175,128 @@ DDS registers are at `$8060`:
 1000 dds-hz  $8060 @ hex . decimal 5762  ok
 ```
 
-### 5.15 Accelerometer
+### 5.15 Serial interfaces: UART, SPI, I2C
+
+Two **UARTs**, two **SPI** masters and an **I2C** master run in the FPGA, as in
+ZYNQ-FPGA-FORTH32, and put each of their signals on **any digital pin** (section 5.11). They
+work on their own once started: a UART receives into its buffer while Forth computes, and an
+SPI or I2C transfer runs while Forth waits for it.
+
+**Pins belong to one user.** A pin given to an interface, a PWM channel or the DDS belongs to
+it until that one is closed or switched off: its latch and direction no longer count, and
+nobody else can take it (` pin taken`). The open words check all their pins first, so a
+refused open changes nothing. `owner` tells who has a pin. A restart, Ctrl-R or `cold`
+closes everything.
+
+| Word | Stack | Description |
+|---|---|---|
+| `owner` | `( pin -- id )` | 0 = nobody, 1..4 = PWM channel 0..3, 5, 6 = UART 0, 1, 7, 8 = SPI 0, 1, 9 = I2C, 10 = DDS. ` bad pin` for numbers that are not pins. |
+
+**UART** u = 0 or 1: 8 data bits, no parity, 1 stop bit (8N1). Each has a 1 KB receive
+buffer and a 1 KB send buffer in the FPGA, so nothing is lost while Forth does something else
+for a while.
+
+| Word | Stack | Description |
+|---|---|---|
+| `uart-open` | `( ud-baud tx rx u -- )` | Open UART u at the baud rate, a double number (`115200.`), with TX and RX on the given pins. ` bad baud` for 0 or less than 3 Bd; above 6,000,000 Bd it runs at 6 MBd. Opening an open UART again moves it to the new pins and rate. |
+| `uart-close` | `( u -- )` | Close it and empty its buffers; its pins return to their own latch and direction. |
+| `uart-emit` | `( c u -- )` | Send a byte; waits only while the send buffer is full. |
+| `uart-type` | `( a n u -- )` | Send n bytes from a. |
+| `uart-key?` | `( u -- f )` | True if a byte has arrived. |
+| `uart-key` | `( u -- c )` | The next byte, waiting for it. The app's requests are answered while it waits. |
+| `uart-status` | `( u -- bits )` | Bit 2 = everything sent, bit 3 = bytes were lost (the receive buffer was full), bit 4 = a framing error (wrong baud rate, or a break). Reading clears bits 3 and 4. |
+
+The UART counts **48,000,000 / baud** clocks per bit, rounded: 115,200 Bd gives 417 clocks
+(115,108 Bd, 0.08 % slow), 9600 gives 5000 (exact), 230,400 gives 208 and 921,600 gives 52
+(both 0.16 % fast), 1,000,000 and 3,000,000 are exact. A UART tolerates about 2 %, so every
+usual rate works. The levels are 3.3 V: a PC's RS-232 port needs a level converter, a USB
+serial adapter for 3.3 V can be connected directly (its TX to our RX, its RX to our TX, GND
+to GND).
+
+```
+115200. 0 1 0 uart-open      \ UART 0: TX on D0, RX on D1
+72 0 uart-emit 105 0 uart-emit
+0 uart-key? .                \ -1 if something came back
+0 uart-close
+```
+
+A **loopback** needs no wire: TX and RX on the same pin receive what is sent, since a pin
+reads back the level it drives (`115200. 7 7 0 uart-open`).
+
+**SPI** s = 0 or 1: master, modes 0..3, 8 or 16 bits per transfer, most significant bit
+first unless `spi-lsb` says otherwise. After start-up: 1 MHz, mode 0, 8 bits, MSB first;
+these settings are kept when the interface is closed and opened again. **Chip selects are
+ordinary pins**: make the pin an output and drive it low around the transfers. (The words `spi`
+and `spi-cs` of section 5.17 belong to the on-board flash and accelerometer, not to these.)
+
+| Word | Stack | Description |
+|---|---|---|
+| `spi-open` | `( sck mosi miso s -- )` | Open SPI s with SCK, MOSI and MISO on the given pins. |
+| `spi-close` | `( s -- )` | Close it; its pins return to their own latch and direction. |
+| `spi-khz` | `( khz s -- )` | Clock in kHz, 1..12000; ` bad frequency` outside. The clock is 24,000 / n kHz for a whole n, the nearest one not above the value: 12000, 8000, 6000, 4800, 4000, …, 1000 (exact), … |
+| `spi-mode` | `( mode s -- )` | Mode 0..3: bit 1 = CPOL (the clock's idle level), bit 0 = CPHA (0: data taken on the first edge, 1: on the second). |
+| `spi-lsb` | `( f s -- )` | True: least significant bit first. |
+| `spi-bits` | `( n s -- )` | 8 or 16 bits per transfer; ` bad bits` for anything else. |
+| `spi-xfer` | `( out s -- in )` | Send out and return what came back at the same time (8 or 16 bits). |
+| `spi-write` | `( a n s -- )` | Send n bytes from a; what comes back is dropped. |
+| `spi-read` | `( a n s -- )` | Receive n bytes into a, sending zeros. |
+
+```
+10 output 10 high               \ D10 = chip select, idle high
+13 11 12 0 spi-open             \ SCK D13, MOSI D11, MISO D12
+1000 0 spi-khz
+10 low $9F 0 spi-xfer drop 0 0 spi-xfer . 10 high
+```
+
+A transfer at 1 MHz takes 8 µs per byte, at 12 MHz under 1 µs. MISO is sampled at the end of
+each bit, as late as possible, which also suits slow devices and long wires.
+
+**I2C:** master, 7-bit addresses, 1..1000 kHz, clock stretching by the device (up to 22 ms,
+then ` i2c timeout`). SCL and SDA are **open drain**: the FPGA pulls them low or lets go, so
+both lines need **pull-up resistors** to 3.3 V. Most I2C modules have them; otherwise use
+4.7 kΩ from each line to 3.3 V. (The weak pull-ups of the `-PullUps` build, section 5.11, are
+too weak except for slow, short connections.)
+
+| Word | Stack | Description |
+|---|---|---|
+| `i2c-open` | `( khz scl sda -- )` | Open with SCL and SDA on the given pins; 100 = standard, 400 = fast mode; the clock is at most the value given. ` bad frequency` outside 1..1000. |
+| `i2c-close` | `( -- )` | Close it; the pins are free again. |
+| `i2c!` | `( b reg addr -- )` | Write byte b into register reg of the device at addr. |
+| `i2c@` | `( reg addr -- b )` | Read register reg of the device at addr (a write of reg, a repeated start, a read). |
+| `i2c-probe` | `( addr -- f )` | True if a device acknowledges addr. |
+| `i2c-scan` | `( -- )` | Print the addresses $08..$77 that answer, in hex. |
+| `i2c-start` | `( -- )` | A start condition (or a repeated start). |
+| `i2c-stop` | `( -- )` | A stop condition. |
+| `i2c-addr` | `( addr rw -- ack? )` | A start, then the address byte: rw 0 = write, 1 = read. True if the device acknowledged. |
+| `i2c-write` | `( b -- ack? )` | Send a byte; true if the device acknowledged. |
+| `i2c-read` | `( ack? -- b )` | Receive a byte; true: acknowledge it (more will be read), false: it is the last. |
+
+`i2c!` and `i2c@` stop with ` no ack` when the device does not acknowledge (wrong address,
+nothing connected, no pull-ups); they send a stop first. Devices with other register layouts
+are reached with the low-level words, for example two bytes from register 0 of a sensor at
+`$48`:
+
+```forth
+: rd16 ( -- n )
+  $48 0 i2c-addr drop 0 i2c-write drop
+  $48 1 i2c-addr drop -1 i2c-read 8 lshift 0 i2c-read or i2c-stop ;
+```
+
+**Registers.** UART u at `$80A0` + 16u, SPI s at `$80C0` + 16s, I2C at `$80E0`:
+
+| Offset | UART | SPI | I2C |
+|---|---|---|---|
+| +0 | read: bit 8 = a byte, bits 7..0 the byte (the read takes it); write: send | write: start a transfer; read: the value received last | write: bits 10..8 command (1 start, 2 stop, 3 write byte, 4 read + ACK, 5 read + NACK), bits 7..0 byte; read: bit 15 busy, bit 9 timeout, bit 8 ACK, bits 7..0 byte |
+| +2 | status (as `uart-status`, bit 0 = a byte, bit 1 = room to send); write: clear bits 3, 4 | bit 0 = busy | clocks per quarter SCL period |
+| +4 | clocks per bit, bits 15..0 (at least 8) | bit 0 CPHA, bit 1 CPOL, bit 2 LSB first, bit 4 16 bits | bit 15 on, bits 13..8 SDA pin, bits 5..0 SCL pin |
+| +6 | clocks per bit, bits 23..16 | clocks per half SCK period (at least 2) | – |
+| +8 | bit 15 on, bits 13..8 RX pin, bits 5..0 TX pin | bit 15 on, bits 13..8 MOSI pin, bits 5..0 SCK pin | – |
+| +10 | – | bits 5..0 MISO pin | – |
+
+The words keep the owner table (`pin-owner`, section 4.3) in step with these registers;
+writing the pin registers directly bypasses it.
+
+### 5.16 Accelerometer
 
 The MAX1000 carries an ST **LIS3DH** three-axis accelerometer on its own SPI pins, driven
 by the same SPI master as the flash. `cold` switches it on (`accel-on`): 100 readings per
@@ -1176,7 +1321,7 @@ other settings of the LIS3DH are possible (see its data sheet); for example `$98
 selects ±4 g, after which `accel@` returns units of 2 mg. `accel-on` (or a restart) sets
 ±2 g again.
 
-### 5.16 Serial flash
+### 5.17 Serial flash
 
 The MAX1000 has a Winbond **W25Q64** serial flash of 8 MB. The FPGA does not configure from
 it (the MAX 10 has its own internal flash), so all of it is available to Forth. The saved
@@ -1237,7 +1382,7 @@ answers no request (they wait until `f-end`), so you may print or wait inside an
 `key?` answers false while such a request waits at the head of the input, and terminal input
 behind the request waits as well, so end the read before you read the keyboard.
 
-### 5.17 Saved source
+### 5.18 Saved source
 
 These words work on the source kept in the flash (section 4.7). The app does the same with
 its saved-source box (section 2.7).
@@ -1267,7 +1412,7 @@ source? . 711  ok                 \ for example
 ...
 ```
 
-### 5.18 Defining words
+### 5.19 Defining words
 
 | Word | Stack | Description |
 |---|---|---|
@@ -1297,7 +1442,7 @@ of its old version:
 
 Use `recurse` to call the word being defined.
 
-### 5.19 Control structures
+### 5.20 Control structures
 
 These are immediate and work **only inside colon definitions**.
 
@@ -1334,7 +1479,7 @@ table 1 2 2 4  ok
 : find3 10 0 do i 3 = if ." found" unloop exit then loop ." none" ;
 ```
 
-### 5.20 Compiler and execution
+### 5.21 Compiler and execution
 
 | Word | Stack | Description |
 |---|---|---|
@@ -1355,7 +1500,7 @@ five . 5  ok
 : quiet shout ; loud ok        \ shout ran while quiet was compiled
 ```
 
-### 5.21 Comments
+### 5.22 Comments
 
 | Word | Description |
 |---|---|
@@ -1365,16 +1510,16 @@ five . 5  ok
 Both work at the terminal and inside definitions. Like every Forth word, each needs a
 space after it.
 
-### 5.22 Interpreter and system
+### 5.23 Interpreter and system
 
 | Word | Stack | Description |
 |---|---|---|
 | `words` | `( -- )` | List all words, newest first (internal words included). |
 | `quit` | `( -- )` | Return to the interpreter loop (the data stack is kept). |
 | `abort` | `( -- )` | Clear the data stack and return to the interpreter loop; stops a running saved source. |
-| `cold` | `( -- )` | Restart in software: the kernel's dictionary, decimal base, banner, LED1 on, the saved source if autostart is on, interpreter loop. Pins, PWM and the DDS keep their state (section 4.6). |
+| `cold` | `( -- )` | Restart in software: the kernel's dictionary, PWM, DDS and serial interfaces off, decimal base, banner, LED1 on, the saved source if autostart is on, interpreter loop. Pins keep their state (section 4.6). |
 
-### 5.23 Variables and constants used by the system
+### 5.24 Variables and constants used by the system
 
 | Word | Content |
 |---|---|
@@ -1383,7 +1528,7 @@ space after it.
 | `dp0`, `latest0` | `dp` and `latest` of the fresh kernel; `cold` restores them. |
 | `dp2` | Next free byte of the data RAM (`buffer:`). |
 | `data0`, `data-end` | Constants: `$4000` and `$5C00`, the data RAM `buffer:` hands out. |
-| `state` | Compile state (section 5.20). |
+| `state` | Compile state (section 5.21). |
 | `base` | Number base (section 5.9). |
 | `tib` | Constant: the terminal input buffer, `$5D00` (82 bytes). |
 | `#tib` | Number of characters in the current input line. |
@@ -1395,7 +1540,7 @@ space after it.
 | `last-start` | 0: no saved source ran at the last start, 1: it ran, 2: it was skipped. |
 | `kcheck` | The sum of the kernel image's cells, set by the cross-compiler (part of the `version` answer). |
 
-### 5.24 Internal words
+### 5.25 Internal words
 
 These words are visible in `words` and can be used, but they mainly exist for the kernel.
 
@@ -1438,6 +1583,10 @@ These words are visible in `words` and can be used, but they mainly exist for th
 | `number?` | `( a n -- x f )` | Convert a string with optional `-` and `$` prefix; f is true on success. |
 | `>number` | `( acc a n -- acc' a' n' )` | Accumulate digits into acc until a non-digit; returns the rest of the string. |
 | `digit?` | `( c -- n f )` | Value of a digit character and whether it is valid in `base`. |
+| `dnumber?` | `( a n -- lo hi f )` | Convert a string with a trailing dot (and an optional `$`) to an unsigned double number. |
+| `>dnumber` | `( lo hi a n -- lo' hi' f )` | Accumulate the digits into a double number; f is true if all were digits. |
+| `d*base+` | `( lo hi n -- lo' hi' )` | Multiply a double number by `base` and add n. |
+| `m+u` | `( ud u -- ud' )` | Add a single to a double number. |
 
 **Compiler:**
 
@@ -1469,6 +1618,15 @@ These words are visible in `words` and can be used, but they mainly exist for th
 | `soh?` | `( -- f )` | The next byte is a SOH, the start of an app request. |
 | `tx` | `( c -- )` | Send a byte as it is (no doubling of 0x01), answering requests while the send FIFO is full. |
 
+**Serial interfaces and pin owners** (section 5.15): `pin-owner` (the table, 32 bytes at
+`$5E20`), `(free) ( pin id -- pin )` (refuses a pin another owner has), `claim ( pin id -- )`,
+`(claim) ( pin id -- pin )`, `release ( id -- )` (frees every pin of that owner),
+`units-off ( -- )` (what `cold` runs), `cid` (the owner being opened), `uart-a ( u -- a )` and
+`spi-a ( s -- a )` (register addresses; ` bad uart`, ` bad spi`), `uart-div ( ud-baud u -- )`
+(sets the divider), `d2/u ( ud -- ud' )` (halves a double number), `spi-ctl ( bits mask s -- )`
+(changes control bits), `(i2c) ( cmd -- status )` (runs one I2C command and waits) and
+`(ack?) ( f -- )` (stops and reports ` no ack`).
+
 **Accelerometer:** `acc-sel ( -- )` and `acc-end ( -- )` select and deselect the LIS3DH;
 `mg ( lo hi -- mg )` turns its two output bytes into mg.
 
@@ -1490,7 +1648,7 @@ the answer. The others build answers and exist for the app's protocol only: `ans
 `answer-n`, `refuse`, `rq-word`, `rq-c`, `rq=`, `=s`, `hexnum`, `hexd`, `hex4`, `hex8`,
 `lf`, `noop`, `on/off`, `dec16` (the length of `store`: decimal, at most 65535), the request words `rq-restart`, `rq-source`, `rq-store`,
 `rq-autostart`, the payload words `p-echo`, `p-version`, `p-status`, `p-words`, `p-stack`,
-`p-board`, `p-source`, the helpers `pwm-ctl`, `pwm-own`, `dds-own`, `port-word`, `pwm-word`,
+`p-board`, `p-source`, the helpers `pwm-ctl`, `port-word`, `pwm-word`, `fnx`, `fn2`,
 `tx-idle`, and the variables and buffers `serving`, `counting`, `acount`, `rq`, `rq#`,
 `rq>`, `rqn-a`, `rqn-n`, `ea`, `en`, `rlen`, `rclo`, `rchi`, `rflag`, `pp`, `s-in` (the
 `input` count of a `status` answer, taken once), `dacc`.
@@ -1696,7 +1854,55 @@ audible); the phase keeps running from step to step, so the sweep has no gaps
 sweep
 ```
 
-### 6.5 A buffer in the data RAM
+### 6.5 Serial interfaces
+
+**A UART loopback on one pin** (nothing to connect: the pin reads back what TX drives)
+```forth
+115200. 7 7 0 uart-open                 \ UART 0, TX and RX on D7
+: send ( -- ) 10 0 do 48 i + 0 uart-emit loop ;
+: show ( -- ) begin 0 uart-key? while 0 uart-key emit repeat ;
+send 2 ms show
+0 uart-close
+```
+prints `0123456789`. The ten bytes take about a millisecond at 115200 Bd; they wait in the
+receive buffer until `show` reads them.
+
+**A bridge between the terminal and a serial device**, for example a GPS module or another
+board with 3.3 V levels: its TX to D1, its RX to D0, GND to GND
+```forth
+: bridge ( -- )   \ terminal <-> UART 0; ESC ends
+  begin
+    0 uart-key? if 0 uart-key emit then
+    key? if key dup 27 = if drop exit then 0 uart-emit then
+  again ;
+9600. 0 1 0 uart-open bridge
+```
+Everything the device sends appears in the terminal, and what you type goes to the device.
+
+**Eight LEDs on a 74HC595 shift register:** SCK (D13) to SH_CP, MOSI (D11) to DS, D10 to
+ST_CP (the latch), OE to GND, MR to 3.3 V
+```forth
+13 11 12 0 spi-open  10 output 10 low   \ MISO (D12) is not used
+: >595 ( c -- ) 0 spi-xfer drop 10 high 10 low ;
+: count595 ( -- ) 256 0 do i >595 20 ms loop ;
+count595
+```
+counts from 0 to 255 in binary on the eight LEDs. `spi-xfer` shifts the byte out MSB first,
+the pulse on D10 copies it to the outputs.
+
+**An I2C EEPROM (24C02 or similar)** at address `$50`, with SCL on PIO3 and SDA on PIO4
+(pins 18 and 19) and pull-ups on both
+```forth
+100 18 19 i2c-open
+i2c-scan                         \ prints 50
+65 0 $50 i2c!  5 ms              \ 65 into cell 0; writing takes 5 ms
+0 $50 i2c@ .                     \ 65
+i2c-close
+```
+The value stays in the EEPROM over power-off. `i2c-scan` is the first thing to try with a new
+module: it shows whether the device answers and at which address.
+
+### 6.6 A buffer in the data RAM
 
 64 readings of AIN3 at 10 ms intervals, kept in the data RAM, then their smallest and
 largest value:
@@ -1710,9 +1916,9 @@ record span . .
 prints the largest, then the smallest value (`1650 1650` for a steady 1.65 V). `samples` uses
 128 bytes of data RAM and leaves the code space alone: `unused-data .` now prints `7040`.
 
-### 6.6 Data in the serial flash
+### 6.7 Data in the serial flash
 
-The flash keeps data over power-off. This example writes the 64 readings of 6.5 to
+The flash keeps data over power-off. This example writes the 64 readings of 6.6 to
 `$100000` (1 MB into the flash) and reads one back:
 ```forth
 : f@ ( lo hi -- x ) f-read 0 spi 0 spi f-end 8 lshift or ;
@@ -1732,7 +1938,7 @@ hex 0 0 fdump decimal
 prints, for example, `48 46 31 36 11 0 0 0 E8 A3 A1 76 0 0 0 0`: the magic `HF16`, the
 length ($11 = 17 bytes), the CRC and the flags (autostart off).
 
-### 6.7 The bench demo: examples/bench.fs
+### 6.8 The bench demo: examples/bench.fs
 
 `examples/bench.fs` uses a small bench wiring:
 
@@ -1768,7 +1974,7 @@ pot 2499 mV  D6 -1 user 0
 
 Any key stops it and switches everything off.
 
-### 6.8 An application that starts with the board
+### 6.9 An application that starts with the board
 
 A saved source whose last line starts a loop turns the MAX1000 into a stand-alone device.
 For example `night.fs`, which lights LED1..LED8 as the input on AIN3 rises:
@@ -1813,8 +2019,9 @@ same words, with these differences:
 
 **Not implemented**
 
-- Double-cell numbers and most of their words (`d+`, `m*`, `*/mod`, `#`, `<# #>`, ...);
-  only `um*`, `um/mod`, `*/` and `ud/u` exist
+- Most double-cell words (`d+`, `d.`, `m*`, `*/mod`, `#`, `<# #>`, ...); only `um*`,
+  `um/mod`, `*/`, `ud/u` and `m+u` exist. Double numbers can be typed with a trailing dot
+  (`115200.`), unsigned only
 - `char`, `[char]` and `s"` (the last two exist only in the cross-compiler), `accept`,
   `evaluate`, `source`
 - `?do`, `leave`, `case`, `does>`, `postpone`, `defer`, `marker`, `forget`
@@ -1861,9 +2068,15 @@ Workflow:
    `ms` runs much faster than on the board. The run ends when all input is read and Forth
    waits for more (also inside a long `ms` loop), or after `--steps n` instructions.
    `--flash image.bin` keeps the flash in a file between runs, `--button` holds the USER
-   button.
-3. Run the tests: `sim\run_flash_tests.ps1` (flash words and the saved source) and
-   `python sim\test_protocol.py` (the app's requests).
+   button. The serial interfaces are modelled per transfer, without timing: `--wire 0-1`
+   joins two pins as a jumper wire would (a UART reaches the UARTs whose RX pin is joined to
+   its TX pin, SPI reads back MOSI when MISO is joined to it), and `--i2c-dev $50` puts a
+   256-byte register memory on the I2C bus.
+3. Run the tests: `sim\run_flash_tests.ps1` (flash words and the saved source),
+   `python sim\test_protocol.py` (the app's requests), `python sim\test_serial.py` (serial
+   interfaces, pin owners, double numbers) and, with Vivado 2023.2 installed,
+   `sim\run_serial.ps1` (the Verilog of the UART, SPI and I2C units against models in a
+   testbench).
 4. Build the kernel image and the FPGA configuration. This needs **Quartus Prime Lite 18.1**
    (with MAX 10 support) and Python 3:
    ```powershell
@@ -1903,12 +2116,15 @@ number.
 | Numbers look wrong, or every number gives `?` | Check `base`: after `hex` or `2 base !`, input and output both use that base, and an error doesn't reset it. `decimal` switches back. |
 | A long line gives an error near its end | Only 80 characters fit on a line; the rest is dropped, possibly in the middle of a word. Split the line. |
 | A digital input reads at random | It is open: the pins have no pull-ups. Connect it, add a resistor, or build with `-PullUps` (section 5.11). |
-| An output pin doesn't change | The pin is still an input (`n output` first), or a PWM channel owns it (`pwm-off`). Check the pin number against the label (section 5.11). |
+| An output pin doesn't change | The pin is still an input (`n output` first), or a PWM channel, the DDS or a serial interface owns it (`n owner .` tells which; switch it off or close it). Check the pin number against the label (section 5.11). |
 | An analog input shows a voltage with nothing connected | Open inputs show the charge of the channel converted before them (section 5.12). |
 | `1 dds-hz` gives 0.98 Hz | The DDS steps are 0.0447 Hz; at low frequencies the error is a few percent. For an exact value use `dds-tuning` (section 5.14). |
-| A DDS pin and a PWM channel interfere | On the same pin their outputs are ORed: switch one off (`dds-off`, `pwm-off`). |
+| ` pin taken` | Another PWM channel, the DDS or a serial interface has the pin: `n owner .` tells which (section 5.15). Close it, or pick another pin. |
+| A UART receives nothing or garbage | TX of one side goes to RX of the other, both sides share GND and use the same baud rate and 8N1; 3.3 V levels only (no RS-232 without a level converter). `uart-status` shows lost bytes (8) and framing errors (16). |
+| `i2c-scan` finds nothing, or ` i2c timeout` | SCL and SDA need pull-up resistors to 3.3 V (most modules have them). Check the pins given to `i2c-open` and the module's supply. |
+| SPI reads only 0 or 255 | MISO is on the wrong pin or the device is not selected: drive its chip-select pin low around the transfers. Check the mode (`spi-mode`) in the device's data sheet. |
 | A PWM change does not show at once | It waits for the end of the running cycle, so a channel at 1 Hz takes up to a second (section 5.13). |
-| `accel@` returns nonsense inside a flash read | The accelerometer and the flash share the SPI master: end the read with `f-end` first (section 5.16). |
-| Data read back from the flash is wrong | The sector was not erased before programming, or `f-prog` crossed a 256-byte page boundary (section 5.16). |
+| `accel@` returns nonsense inside a flash read | The accelerometer and the flash share the SPI master: end the read with `f-end` first (section 5.17). |
+| Data read back from the flash is wrong | The sector was not erased before programming, or `f-prog` crossed a 256-byte page boundary (section 5.17). |
 | ` data RAM full` | `buffer:` asked for more than is left (`unused-data`). A restart frees the data RAM. |
 | The temperature looks a few degrees off | `temp@` is approximate (section 5.12). |

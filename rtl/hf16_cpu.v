@@ -36,8 +36,10 @@ module hf16_cpu (
     reg  [4:0]  dsp = 5'd0;
     reg  [4:0]  rsp = 5'd0;
 
-    reg  [15:0] dstack [0:31];
-    reg  [15:0] rstack [0:31];
+    // MAX 10: one M9K each (Quartus absorbs dsp/rsp as the read address register). Without
+    // the attribute Quartus builds them from logic once the M9K blocks get scarce.
+    (* ramstyle = "M9K" *) reg [15:0] dstack [0:31];
+    (* ramstyle = "M9K" *) reg [15:0] rstack [0:31];
 
     wire [15:0] st1  = dstack[dsp]; // N
     wire [15:0] rst0 = rstack[rsp]; // R
