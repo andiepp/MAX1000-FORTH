@@ -449,7 +449,7 @@ variable pp
 
 : p-echo ( -- ) ea @ en @ type ;
 : p-version ( -- )
-  ." firmware max1000-forth 1.0" lf ." protocol 1" lf
+  ." firmware max1000-forth 1.1" lf ." protocol 1" lf
   ." kernel " dp0 @ 2/ (u.) space kcheck @ hex4 lf ;
 : p-status ( -- )
   ." state running" lf ." pc 0000" lf

@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1 — unreleased
+## 1.1 — 2026-11-06
 
 - **DDS square wave** on any pin (after ZYNQ-FPGA-FORTH32): a 32-bit phase accumulator on
   its own 192 MHz clock, 0.0447 Hz steps, edges on a 5.2 ns grid; `dds-hz`, `dds-khz`,

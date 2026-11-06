@@ -97,7 +97,7 @@ image = b.comp.mem
 kc = b.comp.lookup('kcheck')['xt'] + 4
 total = (sum(image[a] | image[a + 1] << 8 for a in range(0, b.comp.dp, 2))
          - (image[kc] | image[kc + 1] << 8)) & 0xFFFF
-check('version', head[:2] == ['ok', 'version'] and v['firmware'] == ['max1000-forth', '1.0']
+check('version', head[:2] == ['ok', 'version'] and v['firmware'] == ['max1000-forth', '1.1']
       and v['protocol'] == ['1'] and v['kernel'][0] == str(b.comp.dp // 2)
       and int(v['kernel'][1], 16) == total, pl)
 

@@ -14,7 +14,7 @@ the temperature diode of the MAX 10's built-in converter, the board's LIS3DH
 at every start.
 
 This manual covers how to use the system, how the implementation works, and every word in
-the kernel. It describes MAX1000-FORTH 1.0. For the hardware details (I/O map, pins, ADC
+the kernel. It describes MAX1000-FORTH 1.1. For the hardware details (I/O map, pins, ADC
 channels, service requests), see [design.md](design.md).
 
 Contents:
@@ -651,7 +651,7 @@ twice, so the app can tell it from the start of an answer; a terminal program sh
 
 | Request | Answer |
 |---|---|
-| `version` | `firmware max1000-forth 1.0`, `protocol 1`, `kernel <cells> <checksum>` |
+| `version` | `firmware max1000-forth 1.1`, `protocol 1`, `kernel <cells> <checksum>` |
 | `status` | state, receive FIFO bytes, starts, the saved source's state, length, CRC, autostart, and whether it ran at the last start |
 | `stack`, `words` | the data stack at the last prompt; the dictionary |
 | `board` | LEDs and button, both pin ports with their directions and PWM owners, PWM channels, the 9 ADC codes, the temperature code and the accelerometer |

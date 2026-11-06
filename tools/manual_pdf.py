@@ -84,7 +84,7 @@ def build_html(md_text):
 <div class="cover">
   <h1>MAX1000-FORTH</h1>
   <div class="sub">User Manual &mdash; a 16-bit Forth CPU on the Trenz MAX1000 (Intel MAX 10)</div>
-  <div class="meta">MAX1000-FORTH 1.0<br>Generated {today} from docs/Manual.md</div>
+  <div class="meta">MAX1000-FORTH 1.1<br>Generated {today} from docs/Manual.md</div>
 </div>"""
     return (f'<!doctype html><html><head><meta charset="utf-8">'
             f'<title>MAX1000-FORTH User Manual</title><style>{CSS}</style></head>'

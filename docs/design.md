@@ -321,7 +321,7 @@ per byte; an unfinished one is dropped.
 | Request | MAX1000-FORTH |
 |---|---|
 | `echo`, `words`, `stack`, `source`, `erase`, `autostart on\|off` | as ZYNQ-FORTH |
-| `version` | `firmware max1000-forth 1.0`, `protocol 1`, `kernel <cells> <sum hex>` (KCHECK: the image's cell sum, set by the cross-compiler) |
+| `version` | `firmware max1000-forth 1.1`, `protocol 1`, `kernel <cells> <sum hex>` (KCHECK: the image's cell sum, set by the cross-compiler) |
 | `status` | as ZYNQ-FORTH; `pc` is always 0000; `input` = RX FIFO bytes plus the rest of a saved source being read; the source fields come from the cached state |
 | `board` | `board` (bits 7..0 LEDs, bit 16 user button), `ports` (2 words: pins 0–15 and 16–31; bits 15..0 levels, 31..16 driven), `pwm` (bits 3..0 enabled, 6 bits per channel's pin), `adc` (9 codes, channels 0..8), `temp` (TSD code), `accel` (x y z in mg, hex), `dds` (control, tuning; its pin also counts as driven) |
 | `store <len> <crc> on\|off` | erases the header, then 4 KB sectors as the payload arrives; refuses `args`, `timeout`, `crc`, `flash` |
