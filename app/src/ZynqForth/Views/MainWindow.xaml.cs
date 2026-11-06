@@ -219,6 +219,26 @@ public partial class MainWindow : Window, IUserDialogs
         }
     }
 
+    private async void See_Click(object sender, RoutedEventArgs e)
+    {
+        if (WordsList.SelectedItem is not ForthWord word)
+        {
+            MessageBox.Show(this, "Select a word in the dictionary first.", "MAX1000-FORTH",
+                            MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        Decompiled? d = await ViewModel.SeeAsync(word);
+        if (d is not null)
+        {
+            new SeeWindow(d, this, source =>
+            {
+                string text = ViewModel.Editor.Text;
+                ViewModel.Editor.Text = text + (text.Length == 0 || text.EndsWith('\n') ? "" : "\r\n") + source.Replace("\n", "\r\n") + "\r\n";
+            }).Show();
+        }
+    }
+
     private void WordsList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (WordsList.SelectedItem is ForthWord word)

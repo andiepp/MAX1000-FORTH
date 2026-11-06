@@ -97,7 +97,7 @@ image = b.comp.mem
 kc = b.comp.lookup('kcheck')['xt'] + 4
 total = (sum(image[a] | image[a + 1] << 8 for a in range(0, b.comp.dp, 2))
          - (image[kc] | image[kc + 1] << 8)) & 0xFFFF
-check('version', head[:2] == ['ok', 'version'] and v['firmware'] == ['max1000-forth', '1.3']
+check('version', head[:2] == ['ok', 'version'] and v['firmware'] == ['max1000-forth', '1.4']
       and v['protocol'] == ['1'] and v['kernel'][0] == str(b.comp.dp // 2)
       and int(v['kernel'][1], 16) == total, pl)
 
@@ -285,6 +285,17 @@ head, _ = one(b.request(f'store {len(big)} {zlib.crc32(big):08X} on', big)[1])
 check('store 15 KB', head == ['ok', 'store', '0'], head)
 b.request('restart')
 check('15 KB source ran', 'big . 99' in b.type('big .'))
+
+# mem: RAM cells as hex, for the app's decompiler
+xt = b.comp.lookup('led-on')['xt']
+head, pl = one(b.request(f'mem {xt:04X} 8')[1])
+want = ''.join(f'{b.m.mem[xt + 2 * i] | b.m.mem[xt + 2 * i + 1] << 8:04X}' for i in range(8)) + '\n'
+check('mem reads code', head == ['ok', 'mem', '33'] and pl.decode() == want, (head, pl, want))
+head, pl = one(b.request('mem $5FFE 1')[1])
+check('mem at the end of RAM, $ prefix', head[:2] == ['ok', 'mem'] and len(pl) == 5, (head, pl))
+for arg, why in (('', 'args'), ('2000', 'args'), ('2000 0', 'args'), ('2000 257', 'args'),
+                 ('xyz 4', 'args'), ('5FFE 2', 'range'), ('8000 1', 'range'), ('80A0 1', 'range')):
+    check(f'mem {arg!r} refused', one(b.request(f'mem {arg}'.strip())[1])[0] == ['err', 'mem', why])
 
 print('all protocol checks passed' if failures == 0 else f'{failures} check(s) failed')
 sys.exit(1 if failures else 0)

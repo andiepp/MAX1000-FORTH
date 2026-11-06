@@ -66,6 +66,23 @@ public sealed class BoardClient(ForthLink link)
 
     public async Task<bool> EchoAsync(string word) => await TextAsync("echo " + word) == word;
 
+    /// <summary>
+    /// RAM cells from address on (MAX1000-FORTH 1.4 and later, the <c>mem</c> request): at most
+    /// 256 cells, RAM only.
+    /// </summary>
+    public async Task<ushort[]> MemoryAsync(int address, int cells)
+    {
+        string text = (await TextAsync($"mem {address:X4} {cells}")).Trim();
+        var result = new ushort[cells];
+        for (int i = 0; i < cells; i++)
+        {
+            result[i] = ushort.Parse(text.AsSpan(4 * i, 4), System.Globalization.NumberStyles.HexNumber,
+                                     System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        return result;
+    }
+
     public async Task<Max1000State> Max1000BoardAsync() => Max1000State.Parse(await TextAsync("board"));
 
     public Task RestartAsync(bool skipAutostart)

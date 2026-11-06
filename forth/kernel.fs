@@ -554,7 +554,7 @@ variable dacc
 
 : p-echo ( -- ) ea @ en @ type ;
 : p-version ( -- )
-  ." firmware max1000-forth 1.3" lf ." protocol 1" lf
+  ." firmware max1000-forth 1.4" lf ." protocol 1" lf
   ." kernel " dp0 @ 2/ (u.) space kcheck @ hex4 lf ;
 : p-status ( -- )
   ." state running" lf ." pc 0000" lf
@@ -640,8 +640,22 @@ variable dacc
   scan-source s-state @ 1 = 0= if drop s" none" refuse exit then
   1 and hdr 12 + ! write-hdr scan-source ['] noop answer ;
 
+\ mem <addr> <cells>: RAM cells as hex (4 digits each), for the app's decompiler.
+\ Hex address, decimal count 1..256; RAM only ($0000..$5FFF), so no I/O
+\ register is read (a read of $8000 or a UART's data register takes a byte).
+variable maddr  variable mcells
+: p-mem ( -- ) maddr @ mcells @ 0 do dup @ hex4 2 + loop drop lf ;
+: rq-mem ( -- )
+  rq-word dup 0= if 2drop s" args" refuse exit then
+  base @ >r hex number? r> base ! 0= if drop s" args" refuse exit then -2 and maddr !
+  rq-word dec16 0= if drop s" args" refuse exit then
+  dup 1 257 within 0= if drop s" args" refuse exit then mcells !
+  maddr @ mcells @ 2* + $6000 u> maddr @ $6000 u< 0= or if s" range" refuse exit then
+  ['] p-mem mcells @ 4 * 1+ answer-n ;
+
 : dispatch ( -- )
   s" echo" rq= if rq-word en ! ea ! ['] p-echo answer exit then
+  s" mem" rq= if rq-mem exit then
   s" version" rq= if ['] p-version answer exit then
   s" status" rq= if $800E @ fsrc @ + s-in ! ['] p-status answer exit then
   s" words" rq= if ['] p-words answer exit then

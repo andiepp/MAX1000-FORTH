@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.4 — 2026-11-06
+
+- **See** in the app: the Dictionary's new See button shows the selected word as Forth
+  source, decompiled from the board's memory (calls, numbers, `if`/`else`/`then`,
+  `begin`/`until`/`again`, `while`/`repeat`, `do`/`loop`, `."`, `variable`, `constant`,
+  `create`), with a listing of every cell, Copy and To editor.
+- Kernel: the service request `mem <addr> <cells>` returns RAM cells in hex (RAM only, at
+  most 256 cells). Firmware 1.4; 380 words, 12,930 bytes, 3,454 bytes of code space left.
+- Tests: `mem` in `sim/test_protocol.py`; the decompiler against the real kernel
+  (`tools/make_see_fixture.py`, 24 cases plus every kernel word) in the app's tests.
+- `program_flash.ps1` names its steps and the time it took; the repository carries the
+  firmware and the app, so GitHub's Code > Download ZIP works.
+
 ## 1.3.1 — 2026-11-06
 
 - **The MAX1000-FORTH app** comes with the release: `app/Max1000Forth.exe`, one program for

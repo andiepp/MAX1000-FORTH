@@ -8,7 +8,10 @@ the [user manual](Manual.md); the serial protocol the app speaks is protocol 1 o
 [ZYNQ-FORTH](https://github.com/andiepp/ZYNQ-FORTH) (its `docs/Protocol.md`).
 
 All figures in this document are those of release 1.3 (firmware 1.3, protocol 1, kernel of
-376 words and 12,646 bytes), unless a section names an earlier release for comparison. The PDF
+376 words and 12,646 bytes), unless a section names an earlier release for comparison.
+Release 1.4 changed only the kernel and the app: it adds the `mem` request (section 5.13),
+which brings the kernel to 380 words and 12,930 bytes (3,454 bytes of code space left), and
+the app's decompiler (chapter 8). The FPGA's resources and timing are those of 1.3. The PDF
 version, `docs/Implementation-Details.pdf`, is generated from this file by
 `python tools/manual_pdf.py design`.
 
@@ -1611,7 +1614,8 @@ uses the stored length directly and generates its payload once (`answer-n`). Ins
 | Request | Answer payload |
 |---|---|
 | `echo <word>` | the word |
-| `version` | `firmware max1000-forth 1.3`, `protocol 1`, `kernel <cells> <kcheck>` (6323 and the image's cell sum in hex, `A098`, set by the cross-compiler) |
+| `version` | `firmware max1000-forth 1.4`, `protocol 1`, `kernel <cells> <kcheck>` (6465 and the image's cell sum in hex, `5187`, set by the cross-compiler; 1.3: 6323 `A098`) |
+| `mem <addr> <cells>` | (1.4) `rq-mem` takes a hex address (`number?` in base 16, made even) and a decimal count 1..256 (`dec16`), refuses `args` otherwise and `range` beyond `$5FFF` (no I/O register is read: a fetch of `$8000` or of a UART's data register would take a byte); `p-mem` sends each cell as 4 hex digits and LF, length known in advance (`answer-n`) |
 | `status` | `state running`, `pc 0000` (always: the PC is not readable), `input` = RX FIFO bytes (`$800E`) plus the unread rest of a saved source, `starts`, `source` (`none`, `stored` or `damaged`), `length`, `crc`, `autostart` (`on` or `off`), `last` (`none`, `fed` or `skipped`) |
 | `words` | `here <hex>`, then one line per word, newest first: execution token, flags (`-` or `i` immediate, `h` hidden, `n` inline), name |
 | `stack` | the snapshot of the last prompt: depth, then the cells bottom first in hex; `err stack busy` while `snap` copies |
@@ -1967,7 +1971,8 @@ Everything the app shows comes through protocol 1, so any other program can do t
 | `ZynqForth.Core/Board/BoardClient.cs` | `SendTextAsync` ("Run all") sends text only while `InputWindow` minus the `input` of `status` leaves at least 1 KB, so a piece is at most 4 KB and the 8 KB RX FIFO never overflows; `RestartAsync` sends Ctrl-R, or Ctrl-R and ESC for "Restart clean", instead of the `restart` request |
 | `ZynqForth.Core/Board/Max1000State.cs` | parses the `board` answer: LEDs, button, both ports (levels and driven), PWM enables and pins, the 9 ADC codes mapped to AIN0..AIN7 and AIN (the same table as the kernel's `ain`), the temperature (the same interpolation as `temp@`) and the accelerometer; the `dds` and `fn` lines are not decoded, but the DDS pin and the serial output pins show as driven pins |
 | `Controls/Max1000View.cs` | draws the MAX1000: 8 LEDs, the USER button, the chip temperature and the tilt in g, the PWM channels and their pins, the 23 pins (input, output high/low, PWM), bars for the 9 analog inputs in volts |
-| `Views/MainWindow.xaml.cs` | `OpenManual` (Manual button, F1): opens the manual embedded in the app (`docs/Manual.pdf`), written to `%LocalAppData%\MAX1000-FORTH` |
+| `Views/MainWindow.xaml.cs` | `OpenManual` (Manual button, F1): opens the manual embedded in the app (`docs/Manual.pdf`), written to `%LocalAppData%\MAX1000-FORTH`; `See_Click` opens the decompiled word in a `SeeWindow` |
+| `ZynqForth.Core/Board/Decompiler.cs` | (1.4) "See": reads the `words` answer again, finds the word's code range (up to the next header in memory, or HERE), fetches it with `mem` and decompiles it. Literals (with a following `invert`: negative) become numbers, `$xxxx` from `$4000` on, or `['] name` when they equal a word's address; calls become names; ALU instructions become primitives (the table of `tools/hf16.py`; `!` and `c!` are two instructions); a return merged into the last instruction and a final call turned into a jump (cross-compiler) are undone. Control flow from the jump patterns: a forward 0branch is `if`, with `else` when a forward jump ends right before its target, or `while` when a backward jump ends there (that jump is `repeat`); a backward 0branch is `until`, after a call of `(loop)`/`(+loop)` it is `loop`/`+loop` with `swap >r >r` before the target shown as `do` and the following `r> drop r> drop` hidden; a backward jump is `again`. `(.")`/`(s")` calls with their counted string become `."`/`s"`; `create`/`variable` (literal of xt+4, `exit`, data) and one-literal words (`constant`) are recognised. `tools/make_see_fixture.py` builds the test data: the kernel in the simulator with typed definitions, decompiled by `SeeTests` (24 cases, and every kernel word without an unknown instruction) |
 
 Why the smaller input window: on the Zynq the ARM keeps a 64 KB input ring and answers at
 once; on the MAX1000 a `status` request queued behind 16 KB of text would be answered only

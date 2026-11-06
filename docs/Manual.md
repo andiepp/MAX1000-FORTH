@@ -14,7 +14,7 @@ the temperature diode of the MAX 10's built-in converter, the board's LIS3DH
 at every start.
 
 This manual covers how to use the system, how the implementation works, and every word in
-the kernel. It describes MAX1000-FORTH 1.3.1 (firmware 1.3). For the hardware details (I/O map, pins, ADC
+the kernel. It describes MAX1000-FORTH 1.4. For the hardware details (I/O map, pins, ADC
 channels, service requests), see [design.md](design.md).
 
 Contents:
@@ -323,6 +323,21 @@ Both are answers of the kernel; **↻** asks again.
   code in hex. Your own words come first.
 - The box above the list shows only the words containing its text.
 - **Double-click** a word to add it to the terminal's input line.
+- **See** shows the selected word as Forth source, decompiled from the board's memory
+  (firmware 1.4 and later). The app reads the word's code with the `mem` request
+  (section 4.8) and turns the instructions back into Forth: calls into word names, literals
+  into numbers, the jumps of `if` `else` `then`, `begin` `until` `again`, `while` `repeat` and
+  `do` `loop` into those words, and recognises `."`, `variable`, `constant` and `create`.
+  **Listing** shows every cell with its address, instruction and meaning; **To editor**
+  appends the source to the editor, **Copy** puts it on the clipboard. Comments and stack
+  comments are not stored on the board, so they cannot come back. A word with a single
+  number (`: five 5 ;`) compiles exactly like a constant and is shown as one. Kernel words
+  come back as in `forth/kernel.fs`, apart from details the cross-compiler optimised.
+
+  ```
+  : cnt 10 0 do i . loop ;       (typed)
+  : cnt 10 0 do i . loop ;       (See)
+  ```
 
 ### 2.7 The saved source
 
@@ -562,8 +577,8 @@ The instruction encoding is described in the implementation details (`docs/desig
 | Address | Content |
 |---|---|
 | `$0000` | jump to `cold` (start-up) |
-| `$0002`–`$3165` | the kernel: 376 words with their headers and variables |
-| `$3166`–`$3FFF` | free for your definitions (3,738 bytes). `here` shows the next free byte, `unused` how much is left |
+| `$0002`–`$3281` | the kernel: 380 words with their headers and variables |
+| `$3282`–`$3FFF` | free for your definitions (3,454 bytes). `here` shows the next free byte, `unused` how much is left |
 | `$4000`–`$5BFF` | data RAM for `buffer:` (7,168 bytes); `unused-data` shows how much is left |
 | `$5C00`–`$5FFF` | the kernel's buffers (below; `$5E40`–`$5EFF` is not used) |
 | `$6000`–`$7FFF` | no RAM; stores there are ignored |
@@ -744,6 +759,7 @@ twice, so the app can tell it from the start of an answer; a terminal program sh
 | `stack`, `words` | the data stack at the last prompt; the dictionary |
 | `board` | LEDs and button, both pin ports with the pins driven now, PWM channels, the 9 ADC codes, the temperature code, the accelerometer, the DDS (control and tuning) and the pin functions of the serial interfaces (`fn`: UART0 TX, RX, UART1 TX, RX, SPI0 SCK, MOSI, MISO, SPI1 SCK, MOSI, MISO, I2C SCL, SDA; bit 15 = on, bits 5..0 = the pin) |
 | `source`, `store`, `erase`, `autostart on\|off` | the saved source |
+| `mem <addr> <cells>` | RAM cells from a hex address (1..256 cells, RAM only), 4 hex digits each; the app's See uses it (firmware 1.4 and later) |
 | `echo`, `restart [skip]` | a test echo; a restart |
 
 The details are in [design.md](design.md). There is no HASE mode on the MAX1000.
@@ -752,7 +768,7 @@ The details are in [design.md](design.md). There is no HASE mode on the MAX1000.
 
 ## 5. Word reference
 
-The kernel has 376 words. About a third of them are internal: they serve the interpreter,
+The kernel has 380 words. About a third of them are internal: they serve the interpreter,
 the compiler, the saved source and the app's requests (sections 5.24 and 5.25). Where a
 word differs from standard Forth, its entry says so.
 
@@ -894,7 +910,7 @@ New definitions and data are added at `here`, the next free byte of the code spa
 | `buffer: name` | `( n "name" -- )` | Reserve n bytes of data RAM (rounded up to even, so cells stay aligned); `name` then pushes their address. ` data RAM full` if fewer than n bytes are left. |
 | `unused-data` | `( -- n )` | Free data RAM in bytes. |
 
-A fresh kernel leaves 3,738 bytes of code space and 7,168 bytes of data RAM. `buffer:`
+A fresh kernel leaves 3,454 bytes of code space and 7,168 bytes of data RAM. `buffer:`
 rounds odd sizes up, so every buffer starts at an even address. The data RAM is not cleared, and a restart frees all of it, together with the
 words that named the buffers.
 
@@ -1657,7 +1673,7 @@ the receive FIFO; `serve ( -- )` reads one (`rq-line ( -- f )`) and `dispatch ( 
 the answer. The others build answers and exist for the app's protocol only: `answer`,
 `answer-n`, `refuse`, `rq-word`, `rq-c`, `rq=`, `=s`, `hexnum`, `hexd`, `hex4`, `hex8`,
 `lf`, `noop`, `on/off`, `dec16` (the length of `store`: decimal, at most 65535), the request words `rq-restart`, `rq-source`, `rq-store`,
-`rq-autostart`, the payload words `p-echo`, `p-version`, `p-status`, `p-words`, `p-stack`,
+`rq-autostart`, `rq-mem` (with its variables `maddr` and `mcells`), the payload words `p-echo`, `p-version`, `p-status`, `p-words`, `p-stack`, `p-mem`,
 `p-board`, `p-source`, the helpers `pwm-ctl`, `port-word`, `pwm-word`, `fnx`, `fn2`,
 `tx-idle`, and the variables and buffers `serving`, `counting`, `acount`, `rq`, `rq#`,
 `rq>`, `rqn-a`, `rqn-n`, `ea`, `en`, `rlen`, `rclo`, `rchi`, `rflag`, `pp`, `s-in` (the

@@ -663,6 +663,36 @@ public sealed class MainViewModel : ObservableObject
         }, longRunning: true);
     }
 
+    /// <summary>
+    /// Decompiles a word: reads the dictionary again (addresses change as words are added),
+    /// then the word's code with the <c>mem</c> request (firmware 1.4 and later).
+    /// </summary>
+    public async Task<Decompiled?> SeeAsync(ForthWord word)
+    {
+        Decompiled? result = null;
+        await Guard(async c =>
+        {
+            WordList list = await c.WordsAsync();
+            ForthWord? current = list.Words.FirstOrDefault(w => w.Name == word.Name && !w.Hidden);
+            if (current is null)
+            {
+                SetStatus($"{word.Name} is no longer in the dictionary.", true);
+                return;
+            }
+
+            try
+            {
+                result = await Decompiler.SeeAsync(c, list, current);
+                SetStatus($"{word.Name}: {(Decompiler.CodeEnd(list, current) - current.CodeAddress) / 2} cells decompiled.", false);
+            }
+            catch (BoardRefusedException e) when (e.Reason == "unknown")
+            {
+                SetStatus("See needs MAX1000-FORTH firmware 1.4 or later on the board.", true);
+            }
+        });
+        return result;
+    }
+
     private Task RefreshWordsAsync() => Guard(RefreshWordsCoreAsync);
 
     private Task RefreshStackAsync() => Guard(RefreshStackCoreAsync);

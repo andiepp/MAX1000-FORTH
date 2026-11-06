@@ -276,6 +276,9 @@
                         <DockPanel DockPanel.Dock="Top">
                             <Button DockPanel.Dock="Right" Content="↻" Command="{Binding RefreshWordsCommand}" Margin="0"
                                     ToolTip="Read the dictionary again" />
+                            <Button DockPanel.Dock="Right" Content="See" Click="See_Click" Margin="0,0,4,0"
+                                    IsEnabled="{Binding CanTalk}"
+                                    ToolTip="Show the selected word as Forth source, decompiled from the board's memory" />
                             <TextBlock Text="Dictionary" Style="{StaticResource Zf.Heading}" />
                         </DockPanel>
                         <TextBlock DockPanel.Dock="Top" Text="{Binding WordsSummary}" Style="{StaticResource Zf.Dim}" Margin="0,0,0,4" />
