@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 490" font-family="Segoe UI, Arial, sans-serif" font-size="12">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#23476b"/>
+    </marker>
+    <style>
+      .box{fill:#fff;stroke:#23476b;stroke-width:1.2}
+      .reg{fill:#fff4e0;stroke:#b36b00;stroke-width:1.4}
+      .ram{fill:#eef3f9;stroke:#1f5f99;stroke-width:1.4}
+      .mul{fill:#f3f8ef;stroke:#3d7a2a;stroke-width:1.4}
+      .io{fill:#fbeef6;stroke:#9b3b78;stroke-width:1.4}
+      .t{font-weight:600;font-size:13px}
+      .s{font-size:11px;fill:#333}
+      .ln{stroke:#23476b;stroke-width:1.3;fill:none}
+    </style>
+  </defs>
+  <rect width="820" height="490" fill="#fff"/>
+
+  <!-- code side -->
+  <rect class="ram" x="20" y="30" width="150" height="70" rx="4"/>
+  <text class="t" x="95" y="52" text-anchor="middle">RAM port A</text>
+  <text class="s" x="95" y="68" text-anchor="middle">12K × 16, registered</text>
+  <text class="s" x="95" y="84" text-anchor="middle">output = insn</text>
+  <rect class="reg" x="20" y="150" width="150" height="44" rx="4"/>
+  <text class="t" x="95" y="170" text-anchor="middle">PC (13 bits)</text>
+  <text class="s" x="95" y="186" text-anchor="middle">word address</text>
+  <rect class="box" x="20" y="240" width="150" height="80" rx="4"/>
+  <text class="t" x="95" y="260" text-anchor="middle">next PC</text>
+  <text class="s" x="95" y="277" text-anchor="middle">PC+1 · insn[12:0]</text>
+  <text class="s" x="95" y="292" text-anchor="middle">R &gt;&gt; 1 (return)</text>
+  <text class="s" x="95" y="307" text-anchor="middle">0 during reset</text>
+  <path class="ln" d="M95,240 L95,196" marker-end="url(#a)"/>
+  <path class="ln" d="M20,280 L8,280 L8,65 L18,65" marker-end="url(#a)"/>
+  <text class="s" x="12" y="130" transform="rotate(-90 12 130)" text-anchor="middle">code_addr</text>
+
+  <!-- decoder -->
+  <rect class="box" x="210" y="30" width="170" height="70" rx="4"/>
+  <text class="t" x="295" y="52" text-anchor="middle">decode</text>
+  <text class="s" x="295" y="68" text-anchor="middle">literal · jump · 0branch</text>
+  <text class="s" x="295" y="84" text-anchor="middle">call · ALU fields</text>
+  <path class="ln" d="M170,65 L208,65" marker-end="url(#a)"/>
+  <path class="ln" d="M295,100 L295,118 L190,118 L190,280 L172,280" marker-end="url(#a)"/>
+
+  <!-- stacks -->
+  <rect class="reg" x="230" y="150" width="90" height="44" rx="4"/>
+  <text class="t" x="275" y="170" text-anchor="middle">T</text>
+  <text class="s" x="275" y="186" text-anchor="middle">top of stack</text>
+  <rect class="box" x="230" y="210" width="90" height="56" rx="4"/>
+  <text class="t" x="275" y="230" text-anchor="middle">N = dstack</text>
+  <text class="s" x="275" y="246" text-anchor="middle">32 × 16, M9K</text>
+  <text class="s" x="275" y="260" text-anchor="middle">pointer dsp</text>
+  <rect class="box" x="230" y="282" width="90" height="56" rx="4"/>
+  <text class="t" x="275" y="302" text-anchor="middle">R = rstack</text>
+  <text class="s" x="275" y="318" text-anchor="middle">32 × 16, M9K</text>
+  <text class="s" x="275" y="332" text-anchor="middle">pointer rsp</text>
+
+  <!-- ALU -->
+  <rect class="box" x="360" y="150" width="130" height="188" rx="4"/>
+  <text class="t" x="425" y="172" text-anchor="middle">ALU (op)</text>
+  <text class="s" x="425" y="192" text-anchor="middle">25 functions of</text>
+  <text class="s" x="425" y="207" text-anchor="middle">T, N, R, [T], depth</text>
+  <text class="s" x="425" y="231" text-anchor="middle">+ − and or xor not</text>
+  <text class="s" x="425" y="246" text-anchor="middle">compares, shifts</text>
+  <text class="s" x="425" y="261" text-anchor="middle">N × T low / high</text>
+  <text class="s" x="425" y="318" text-anchor="middle">→ new T</text>
+  <path class="ln" d="M320,172 L358,172" marker-end="url(#a)"/>
+  <path class="ln" d="M320,238 L358,238" marker-end="url(#a)"/>
+  <path class="ln" d="M320,310 L358,310" marker-end="url(#a)"/>
+  <path class="ln" d="M425,150 L425,130 L275,130 L275,148" marker-end="url(#a)"/>
+
+  <!-- multiplier -->
+  <rect class="mul" x="530" y="150" width="150" height="56" rx="4"/>
+  <text class="t" x="605" y="170" text-anchor="middle">16 × 16 multiplier</text>
+  <text class="s" x="605" y="186" text-anchor="middle">N × T → 32 bits</text>
+  <text class="s" x="605" y="200" text-anchor="middle">embedded, 2 × 9-bit</text>
+  <path class="ln" d="M530,178 L492,178" marker-end="url(#a)"/>
+
+  <!-- I/O read side -->
+  <rect class="reg" x="530" y="250" width="150" height="44" rx="4"/>
+  <text class="t" x="605" y="270" text-anchor="middle">io_addr</text>
+  <text class="s" x="605" y="286" text-anchor="middle">mem_addr, registered</text>
+  <rect class="io" x="530" y="318" width="150" height="56" rx="4"/>
+  <text class="t" x="605" y="338" text-anchor="middle">I/O read mux</text>
+  <text class="s" x="605" y="354" text-anchor="middle">decodes io_addr</text>
+  <text class="s" x="605" y="368" text-anchor="middle">(combinational)</text>
+  <path class="ln" d="M605,294 L605,316" marker-end="url(#a)"/>
+
+  <!-- data port -->
+  <rect class="ram" x="20" y="390" width="440" height="66" rx="4"/>
+  <text class="t" x="240" y="410" text-anchor="middle">RAM port B (data)</text>
+  <text class="s" x="240" y="427" text-anchor="middle">address = next T (mem_addr); in a store cycle T itself</text>
+  <text class="s" x="240" y="443" text-anchor="middle">write data = N (! c!) · read data → ALU op 13 / 14</text>
+  <path class="ln" d="M275,194 L275,204 L340,204 L340,388" marker-end="url(#a)"/>
+  <text class="s" x="336" y="384" text-anchor="end">mem_addr</text>
+  <path class="ln" d="M340,370 L515,370 L515,272 L528,272" marker-end="url(#a)"/>
+
+  <!-- read data select -->
+  <rect class="box" x="500" y="400" width="300" height="56" rx="4"/>
+  <text class="t" x="650" y="418" text-anchor="middle">read data select</text>
+  <text class="s" x="650" y="434" text-anchor="middle">io_sel (registered address bit 15)</text>
+  <text class="s" x="650" y="448" text-anchor="middle">picks the I/O mux or RAM port B</text>
+  <path class="ln" d="M460,428 L498,428" marker-end="url(#a)"/>
+  <path class="ln" d="M605,374 L605,398" marker-end="url(#a)"/>
+  <path class="ln" d="M545,400 L545,388 L470,388 L470,340" marker-end="url(#a)"/>
+  <text class="s" x="465" y="358" text-anchor="end">mem_rdata</text>
+
+  <text class="s" x="20" y="478">The I/O multiplexer works from io_addr, one clock after the address, like the RAM's own address register: this is what allows 48 MHz.</text>
+</svg>

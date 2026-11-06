@@ -5,7 +5,7 @@
 //   +2  period, high 16 bits   (writing it takes both halves: clocks per cycle, at least 2)
 //   +4  duty                   (fraction of the period in 1/65536; 0 = always low,
 //                               0xFFFF = always high)
-//   +6  control                (bit 15 enable, bits 5..0 pin number 0..41)
+//   +6  control                (bit 15 enable, bits 5..0 pin number; MAX1000: 0..14, 16..23)
 // Reads return what was written. A new period or duty takes effect at the end of the
 // running cycle, so changes never cut a pulse short; enabling starts a fresh cycle.
 // The output is high for the first (period * duty) / 65536 clocks of each cycle.

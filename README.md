@@ -49,10 +49,11 @@ straight to the board's USB serial port.
 **Ctrl-R** restarts Forth at any time, even out of an endless loop. The board's **Reset**
 button reloads the whole FPGA.
 
-The [user manual](docs/Manual.md) (PDF in the release) covers the app, the interpreter,
-every word, examples and troubleshooting; [docs/design.md](docs/design.md) the
-implementation: instruction set, memory and I/O maps, the peripherals, the saved source and
-the service protocol.
+The [user manual](docs/Manual.md) ([PDF](docs/Manual.pdf)) covers the app, the interpreter,
+every word, examples and troubleshooting. The implementation details
+([docs/design.md](docs/design.md), [PDF](docs/Implementation-Details.pdf)) describe how it is
+built: the HF16 CPU and its instruction set, memory and I/O, every peripheral, the Forth
+kernel, the service protocol, the tools and the design decisions.
 
 ## Words at a glance
 
@@ -103,7 +104,8 @@ elements, with about 1.5 ns of slack at 48 MHz (CPU) and 1.2 ns at 192 MHz (DDS)
 | `forth/kernel.fs` | the Forth kernel |
 | `tools/hf16.py` | cross-compiler and instruction-set simulator |
 | `tools/mforth.py` | line sender and source store |
-| `tools/manual_pdf.py` | builds `docs/Manual.pdf` |
+| `tools/manual_pdf.py` | builds `docs/Manual.pdf` (`manual`) and `docs/Implementation-Details.pdf` (`design`) |
+| `tools/manual_contents.py` | rewrites the manual's contents list (chapters and sections, as links) from its headings |
 | `scripts/` | build, flash and release scripts |
 | `sim/` | simulator tests |
 | `docs/` | user manual, implementation details, images |

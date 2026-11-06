@@ -8,7 +8,8 @@ the Forth kernel is part of the FPGA configuration, and Forth talks directly ove
 board's USB serial port, where the **ZYNQ-FORTH app** or any terminal program talks to it.
 
 Besides the board's 8 LEDs and its user button, Forth reaches the 23 digital pins of the
-Arduino-style header and the Pmod header, with four PWM channels, the 9 analog inputs and
+Arduino-style header and the Pmod header, with four PWM channels and a DDS square-wave
+generator, the 9 analog inputs and
 the temperature diode of the MAX 10's built-in converter, the board's LIS3DH
 **accelerometer**, and its 8 MB **serial flash**, which also keeps one Forth source that runs
 at every start.
@@ -19,21 +20,78 @@ channels, service requests), see [design.md](design.md).
 
 Contents:
 
-1. [Getting started](#1-getting-started)
-2. [The ZYNQ-FORTH app](#2-the-zynq-forth-app)
-3. [Working with the interpreter](#3-working-with-the-interpreter)
-4. [How the implementation works](#4-how-the-implementation-works)
-5. [Word reference](#5-word-reference)
-6. [Examples](#6-examples)
-7. [Differences from standard Forth](#7-differences-from-standard-forth)
-8. [Changing the kernel](#8-changing-the-kernel)
-9. [Troubleshooting](#9-troubleshooting)
+- **[1. Getting started](#1-getting-started)**
+  - [1.1 What you need](#11-what-you-need)
+  - [1.2 Put MAX1000-FORTH on the board](#12-put-max1000-forth-on-the-board)
+  - [1.3 Connect](#13-connect)
+  - [1.4 First session](#14-first-session)
+- **[2. The ZYNQ-FORTH app](#2-the-zynq-forth-app)**
+  - [2.1 Connecting](#21-connecting)
+  - [2.2 The layout](#22-the-layout)
+  - [2.3 How the app talks to the MAX1000](#23-how-the-app-talks-to-the-max1000)
+  - [2.4 The terminal](#24-the-terminal)
+  - [2.5 The editor](#25-the-editor)
+  - [2.6 The data stack and the dictionary](#26-the-data-stack-and-the-dictionary)
+  - [2.7 The saved source](#27-the-saved-source)
+  - [2.8 The board view](#28-the-board-view)
+  - [2.9 A worked session](#29-a-worked-session)
+- **[3. Working with the interpreter](#3-working-with-the-interpreter)**
+  - [3.1 Input line](#31-input-line)
+  - [3.2 Words and numbers](#32-words-and-numbers)
+  - [3.3 Stack notation](#33-stack-notation)
+  - [3.4 Errors](#34-errors)
+- **[4. How the implementation works](#4-how-the-implementation-works)**
+  - [4.1 The pieces](#41-the-pieces)
+  - [4.2 The HF16 CPU](#42-the-hf16-cpu)
+  - [4.3 Memory map](#43-memory-map)
+  - [4.4 Dictionary entries](#44-dictionary-entries)
+  - [4.5 What a colon definition compiles to](#45-what-a-colon-definition-compiles-to)
+  - [4.6 Start-up and restarts](#46-start-up-and-restarts)
+  - [4.7 The saved source (autostart)](#47-the-saved-source-autostart)
+  - [4.8 Service requests (the app)](#48-service-requests-the-app)
+- **[5. Word reference](#5-word-reference)**
+  - [5.1 Data stack](#51-data-stack)
+  - [5.2 Return stack](#52-return-stack)
+  - [5.3 Arithmetic](#53-arithmetic)
+  - [5.4 Logic and shifts](#54-logic-and-shifts)
+  - [5.5 Comparison](#55-comparison)
+  - [5.6 Memory](#56-memory)
+  - [5.7 Dictionary space and data RAM](#57-dictionary-space-and-data-ram)
+  - [5.8 Terminal input and output](#58-terminal-input-and-output)
+  - [5.9 Number base](#59-number-base)
+  - [5.10 Board I/O](#510-board-io)
+  - [5.11 Digital pins](#511-digital-pins)
+  - [5.12 Analog inputs and temperature](#512-analog-inputs-and-temperature)
+  - [5.13 PWM](#513-pwm)
+  - [5.14 DDS square-wave generator](#514-dds-square-wave-generator)
+  - [5.15 Accelerometer](#515-accelerometer)
+  - [5.16 Serial flash](#516-serial-flash)
+  - [5.17 Saved source](#517-saved-source)
+  - [5.18 Defining words](#518-defining-words)
+  - [5.19 Control structures](#519-control-structures)
+  - [5.20 Compiler and execution](#520-compiler-and-execution)
+  - [5.21 Comments](#521-comments)
+  - [5.22 Interpreter and system](#522-interpreter-and-system)
+  - [5.23 Variables and constants used by the system](#523-variables-and-constants-used-by-the-system)
+  - [5.24 Internal words](#524-internal-words)
+- **[6. Examples](#6-examples)**
+  - [6.1 LEDs and the user button](#61-leds-and-the-user-button)
+  - [6.2 Digital pins](#62-digital-pins)
+  - [6.3 Analog inputs, temperature and accelerometer](#63-analog-inputs-temperature-and-accelerometer)
+  - [6.4 PWM and DDS](#64-pwm-and-dds)
+  - [6.5 A buffer in the data RAM](#65-a-buffer-in-the-data-ram)
+  - [6.6 Data in the serial flash](#66-data-in-the-serial-flash)
+  - [6.7 The bench demo: examples/bench.fs](#67-the-bench-demo-examplesbenchfs)
+  - [6.8 An application that starts with the board](#68-an-application-that-starts-with-the-board)
+- **[7. Differences from standard Forth](#7-differences-from-standard-forth)**
+- **[8. Changing the kernel](#8-changing-the-kernel)**
+- **[9. Troubleshooting](#9-troubleshooting)**
 
 ---
 
 ## 1. Getting started
 
-### What you need
+### 1.1 What you need
 
 - A Trenz **MAX1000** with the **10M08SAU169C8G** (TEI0001-02) and a micro-USB cable.
   MAX1000-FORTH is built for this device; a board with another MAX 10 needs its own build
@@ -46,7 +104,7 @@ Contents:
 - Optionally Python 3 with pyserial (`pip install pyserial`) for `tools/mforth.py`, which
   sends files and saves a source in the board's flash from the command line.
 
-### Put MAX1000-FORTH on the board
+### 1.2 Put MAX1000-FORTH on the board
 
 Paths in this manual are relative to the **MAX1000-FORTH folder**: the folder of an unpacked
 release, or the repository. Commands run in that folder.
@@ -92,7 +150,7 @@ quartus_pgm -c 1 -m JTAG -o "p;build/output_files/max1000_forth.pof"    # intern
 quartus_pgm -c 1 -m JTAG -o "p;build/output_files/max1000_forth.sof"    # FPGA only
 ```
 
-### Connect
+### 1.3 Connect
 
 The MAX1000's USB chip (from FTDI) has two channels: channel A is the JTAG
 programmer, channel B the serial port Forth uses. Windows shows channel B as a USB serial
@@ -109,7 +167,7 @@ click **Connect** (chapter 2). Or use a terminal program:
 
 Only one program can use the serial port at a time.
 
-### First session
+### 1.4 First session
 
 ```
 HF16 Forth on MAX1000
@@ -294,11 +352,12 @@ board as Forth sees it, read several times a second:
   header (pins 16..23). Each pin is coloured by what it does: an input reading 1 or 0, an
   output driving 1 or 0, or a pin owned by a PWM channel (marked `~` and the channel
   number). Open inputs have no pull-ups and may show either level (section 5.11);
-- which PWM channels are on, and their pins (*PWM0 → D3*);
+- which PWM channels are on, and their pins (*PWM0 → D3*). A pin the DDS drives shows as an
+  output (section 5.14);
 - the **analog inputs** AIN0..AIN7 and AIN as bars with their voltage, 0 to 3.3 V
   (section 5.12);
 - the chip **temperature** and the **tilt** from the accelerometer in g (x, y, z), with an
-  app newer than 2.4 (sections 5.12 and 5.14).
+  app newer than 2.4 (sections 5.12 and 5.15).
 
 The view only reads: Forth's I/O is never changed by it. It is updated only while Forth
 answers (section 2.3).
@@ -384,7 +443,7 @@ and leaves `c`.
 | `c` | character or byte (0..255) |
 | `a`, `addr` | byte address |
 | `ud` | unsigned double number, two cells: low cell, then the high cell on top |
-| `lo hi` | a 24-bit flash address: `lo` = bits 15..0, `hi` = bits 23..16 (section 5.15) |
+| `lo hi` | a 24-bit flash address: `lo` = bits 15..0, `hi` = bits 23..16 (section 5.16) |
 | `xt` | execution token (address of a word's code) |
 | `h` | header address of a dictionary entry |
 | `"name"` | a name that follows in the input line |
@@ -413,7 +472,7 @@ that pushes more than 28 items wraps the stack pointer around, and this is repor
 underflow.
 
 A few words report a problem without an error: `autostart` prints ` no saved source`, and
-`store` ` store timeout` or ` store failed` (section 5.16). They leave the rest of the line
+`store` ` store timeout` or ` store failed` (section 5.17). They leave the rest of the line
 running.
 
 ---
@@ -432,6 +491,7 @@ running.
    ├─ 8 user LEDs, user button, ms timer
    ├─ 23 digital pins: D0..D14, PIO_01..PIO_08
    ├─ PWM: 4 channels on any pin
+   ├─ DDS: square wave on any pin, 192 MHz clock
    ├─ ADC: AIN, AIN0..AIN7, temperature diode
    ├─ SPI: serial flash (8 MB), LIS3DH accelerometer
    └─ CRC-32 unit
@@ -447,6 +507,7 @@ has loaded its configuration. The serial port is connected straight to the CPU's
 | Top level: PLL, RAM, UART, I/O registers, pins | `rtl/max1000_forth.v` |
 | UART and its FIFOs | `rtl/uart.v`, `rtl/fifo_bram.v` |
 | PWM (from ZYNQ-FORTH) | `rtl/pwm.v` |
+| DDS square-wave generator | `rtl/dds.v` |
 | ADC scanner around Intel's Modular ADC core | `rtl/adc_scan.v` |
 | SPI master (flash, accelerometer) and CRC-32 unit | `rtl/spi_flash.v` |
 | Forth kernel, written in Forth | `forth/kernel.fs` |
@@ -525,11 +586,11 @@ The I/O registers can also be read and written directly with `@` and `!`:
 | `$8026` | – | add the low byte to the CRC |
 | `$8028`, `$802A` | CRC-32, bits 15..0 and 31..16 | – |
 | `$8040`–`$8052` | ADC channels 0..8 and the temperature diode (slot 9), 12 bits | – |
-| `$8060`–`$8064` | DDS: tuning low, high, control (section 5.13) | DDS registers |
+| `$8060`–`$8064` | DDS: tuning low, high, control (section 5.14) | DDS registers |
 | `$8080`–`$809E` | PWM channels 0..3 (section 5.13) | PWM registers |
 
-Section 5.11 explains the ports, 5.12 the ADC, 5.13 the PWM and DDS registers and 5.15 the
-SPI and CRC registers.
+Section 5.11 explains the ports, 5.12 the ADC, 5.13 the PWM registers, 5.14 the DDS and 5.16
+the SPI and CRC registers.
 
 ### 4.4 Dictionary entries
 
@@ -585,7 +646,7 @@ which jumps to `cold`.
 
 **Ctrl-R.** The serial receiver catches the byte 0x12 (Forth never sees it) and resets the
 CPU, both serial FIFOs (typed-ahead input is discarded), the LEDs, the pins (all inputs
-again) and the PWM channels. The RAM keeps its contents, and the CPU starts at address 0
+again), the PWM channels and the DDS. The RAM keeps its contents, and the CPU starts at address 0
 again. A program can do the same by writing any value to `$8008`. The millisecond counter
 keeps running.
 
@@ -597,7 +658,7 @@ interpreter loop. `quit` copies the data stack for the app's stack view (`snap`)
 line (`accept-line`), interprets it (`interpret`), prints ` ok`, and repeats.
 
 Typing `cold` (or `0 execute`) runs the same word without the hardware reset: the
-dictionary is reset and the saved source runs again, but the pins, LEDs and PWM channels keep
+dictionary is reset and the saved source runs again, but the pins, LEDs, PWM channels and the DDS keep
 their state.
 
 ### 4.7 The saved source (autostart)
@@ -612,7 +673,7 @@ One Forth source can be kept in the serial flash (from the app, section 2.7, or 
 
 With autostart on, `cold` feeds it to Forth at power-up, after RESET and after every
 restart, exactly as if it were typed: the definitions are compiled and the commands run.
-Its lines are not echoed and get no ` ok`; only what they print appears. The words it
+Its lines are not echoed and get no ` ok` (only the last one, which becomes the first prompt); only what they print appears. The words it
 defines are there when the first prompt comes, and its last line may start an application
 (section 6.8). The kernel itself is never changed, so a faulty source cannot break the
 start for good:
@@ -654,7 +715,7 @@ twice, so the app can tell it from the start of an answer; a terminal program sh
 | `version` | `firmware max1000-forth 1.1`, `protocol 1`, `kernel <cells> <checksum>` |
 | `status` | state, receive FIFO bytes, starts, the saved source's state, length, CRC, autostart, and whether it ran at the last start |
 | `stack`, `words` | the data stack at the last prompt; the dictionary |
-| `board` | LEDs and button, both pin ports with their directions and PWM owners, PWM channels, the 9 ADC codes, the temperature code and the accelerometer |
+| `board` | LEDs and button, both pin ports with their directions and PWM/DDS owners, PWM channels, the 9 ADC codes, the temperature code, the accelerometer and the DDS (control and tuning) |
 | `source`, `store`, `erase`, `autostart on\|off` | the saved source |
 | `echo`, `restart [skip]` | a test echo; a restart |
 
@@ -665,7 +726,7 @@ The details are in [design.md](design.md). There is no HASE mode on the MAX1000.
 ## 5. Word reference
 
 The kernel has 323 words. About a third of them are internal: they serve the interpreter,
-the compiler, the saved source and the app's requests (sections 5.22 and 5.23). Where a
+the compiler, the saved source and the app's requests (sections 5.23 and 5.24). Where a
 word differs from standard Forth, its entry says so.
 
 ### 5.1 Data stack
@@ -978,7 +1039,7 @@ converter samples each channel four times in a row and keeps only the last resul
 diode, −40 °C = 3798 and 96 °C = 3510, so it is approximate: expect a few degrees of error.
 It is the die temperature, typically somewhat above the room.
 
-### 5.13 PWM and DDS
+### 5.13 PWM
 
 Four PWM channels, 0..3, make square waves of variable frequency and duty cycle in the
 FPGA, independently of Forth: once set, a channel runs on its own, also while Forth
@@ -1034,7 +1095,9 @@ duty × 3.3 V, which the ADC reads (section 6.4).
 1000 0 pwm-hz  0 pwm @ u. 48000  ok
 ```
 
-**DDS.** For a square wave of an exact, finely set frequency there is a DDS (direct digital
+### 5.14 DDS square-wave generator
+
+For a square wave of an exact, finely set frequency there is a DDS (direct digital
 synthesis) generator: a 32-bit phase accumulator on its own 192 MHz clock, whose top bit is
 the output. It drives **any digital pin**, like a PWM channel, and runs on its own once set.
 
@@ -1076,7 +1139,7 @@ DDS registers are at `$8060`:
 1000 dds-hz  $8060 @ hex . decimal 5762  ok
 ```
 
-### 5.14 Accelerometer
+### 5.15 Accelerometer
 
 The MAX1000 carries an ST **LIS3DH** three-axis accelerometer on its own SPI pins, driven
 by the same SPI master as the flash. `cold` switches it on (`accel-on`): 100 readings per
@@ -1101,7 +1164,7 @@ other settings of the LIS3DH are possible (see its data sheet); for example `$98
 selects ±4 g, after which `accel@` returns units of 2 mg. `accel-on` (or a restart) sets
 ±2 g again.
 
-### 5.15 Serial flash
+### 5.16 Serial flash
 
 The MAX1000 has a Winbond **W25Q64** serial flash of 8 MB. The FPGA does not configure from
 it (the MAX 10 has its own internal flash), so all of it is available to Forth. The saved
@@ -1160,7 +1223,7 @@ accelerometer word (`accel@`, `acc@`, …) and no other flash word, or the read 
 app cannot get in the way: while the flash or the accelerometer is selected, the kernel
 answers no request (they wait until `f-end`), so you may print or wait inside an open read.
 
-### 5.16 Saved source
+### 5.17 Saved source
 
 These words work on the source kept in the flash (section 4.7). The app does the same with
 its saved-source box (section 2.7).
@@ -1190,7 +1253,7 @@ source? . 711  ok                 \ for example
 ...
 ```
 
-### 5.17 Defining words
+### 5.18 Defining words
 
 | Word | Stack | Description |
 |---|---|---|
@@ -1220,7 +1283,7 @@ of its old version:
 
 Use `recurse` to call the word being defined.
 
-### 5.18 Control structures
+### 5.19 Control structures
 
 These are immediate and work **only inside colon definitions**.
 
@@ -1257,7 +1320,7 @@ table 1 2 2 4  ok
 : find3 10 0 do i 3 = if ." found" unloop exit then loop ." none" ;
 ```
 
-### 5.19 Compiler and execution
+### 5.20 Compiler and execution
 
 | Word | Stack | Description |
 |---|---|---|
@@ -1278,7 +1341,7 @@ five . 5  ok
 : quiet shout ; loud ok        \ shout ran while quiet was compiled
 ```
 
-### 5.20 Comments
+### 5.21 Comments
 
 | Word | Description |
 |---|---|
@@ -1288,16 +1351,16 @@ five . 5  ok
 Both work at the terminal and inside definitions. Like every Forth word, each needs a
 space after it.
 
-### 5.21 Interpreter and system
+### 5.22 Interpreter and system
 
 | Word | Stack | Description |
 |---|---|---|
 | `words` | `( -- )` | List all words, newest first (internal words included). |
 | `quit` | `( -- )` | Return to the interpreter loop (the data stack is kept). |
 | `abort` | `( -- )` | Clear the data stack and return to the interpreter loop; stops a running saved source. |
-| `cold` | `( -- )` | Restart in software: the kernel's dictionary, decimal base, banner, LED1 on, the saved source if autostart is on, interpreter loop. Pins and PWM keep their state (section 4.6). |
+| `cold` | `( -- )` | Restart in software: the kernel's dictionary, decimal base, banner, LED1 on, the saved source if autostart is on, interpreter loop. Pins, PWM and the DDS keep their state (section 4.6). |
 
-### 5.22 Variables and constants used by the system
+### 5.23 Variables and constants used by the system
 
 | Word | Content |
 |---|---|
@@ -1306,7 +1369,7 @@ space after it.
 | `dp0`, `latest0` | `dp` and `latest` of the fresh kernel; `cold` restores them. |
 | `dp2` | Next free byte of the data RAM (`buffer:`). |
 | `data0`, `data-end` | Constants: `$4000` and `$5C00`, the data RAM `buffer:` hands out. |
-| `state` | Compile state (section 5.19). |
+| `state` | Compile state (section 5.20). |
 | `base` | Number base (section 5.9). |
 | `tib` | Constant: the terminal input buffer, `$5D00` (82 bytes). |
 | `#tib` | Number of characters in the current input line. |
@@ -1318,7 +1381,7 @@ space after it.
 | `last-start` | 0: no saved source ran at the last start, 1: it ran, 2: it was skipped. |
 | `kcheck` | The sum of the kernel image's cells, set by the cross-compiler (part of the `version` answer). |
 
-### 5.23 Internal words
+### 5.24 Internal words
 
 These words are visible in `words` and can be used, but they mainly exist for the kernel.
 
@@ -1555,7 +1618,7 @@ moves toward LED1 or LED8.
 up?
 ```
 
-### 6.4 PWM
+### 6.4 PWM and DDS
 
 **Dim an LED on D3** (LED and resistor as in 6.2)
 ```forth
@@ -1600,6 +1663,15 @@ variable epin  variable elast  variable ecount
 1000 dds-hz  3 dds-pin  3 1000 edges .  dds-off
 ```
 prints about 2000 (two edges per period; on the board it printed 2001).
+
+**A DDS sweep:** 100 Hz to 10 kHz in 100 steps on D7 (a piezo buzzer from D7 to GND makes it
+audible); the phase keeps running from step to step, so the sweep has no gaps
+```forth
+: sweep ( -- )
+  100 dds-hz 7 dds-pin
+  100 0 do i 100 * 100 + dds-hz 20 ms loop dds-off ;
+sweep
+```
 
 ### 6.5 A buffer in the data RAM
 
@@ -1713,7 +1785,7 @@ same words, with these differences:
   has 32 entries.
 - Compile-only words (`if`, `do`, `."`, `[']`, ...) are not checked. Typed outside a
   definition, they write stray code into the dictionary and leave junk on the stack.
-- `buffer:` takes its memory from a separate data RAM (section 5.7) and does not align it.
+- `buffer:` takes its memory from a separate data RAM (section 5.7) and rounds the size up to even, so buffers stay cell-aligned.
 - Code must lie below `$4000`; there is no check for a full dictionary.
 
 **Not implemented**
@@ -1810,8 +1882,10 @@ number.
 | A digital input reads at random | It is open: the pins have no pull-ups. Connect it, add a resistor, or build with `-PullUps` (section 5.11). |
 | An output pin doesn't change | The pin is still an input (`n output` first), or a PWM channel owns it (`pwm-off`). Check the pin number against the label (section 5.11). |
 | An analog input shows a voltage with nothing connected | Open inputs show the charge of the channel converted before them (section 5.12). |
+| `1 dds-hz` gives 0.98 Hz | The DDS steps are 0.0447 Hz; at low frequencies the error is a few percent. For an exact value use `dds-tuning` (section 5.14). |
+| A DDS pin and a PWM channel interfere | On the same pin their outputs are ORed: switch one off (`dds-off`, `pwm-off`). |
 | A PWM change does not show at once | It waits for the end of the running cycle, so a channel at 1 Hz takes up to a second (section 5.13). |
-| `accel@` returns nonsense inside a flash read | The accelerometer and the flash share the SPI master: end the read with `f-end` first (section 5.15). |
-| Data read back from the flash is wrong | The sector was not erased before programming, or `f-prog` crossed a 256-byte page boundary (section 5.15). |
+| `accel@` returns nonsense inside a flash read | The accelerometer and the flash share the SPI master: end the read with `f-end` first (section 5.16). |
+| Data read back from the flash is wrong | The sector was not erased before programming, or `f-prog` crossed a 256-byte page boundary (section 5.16). |
 | ` data RAM full` | `buffer:` asked for more than is left (`unused-data`). A restart frees the data RAM. |
 | The temperature looks a few degrees off | `temp@` is approximate (section 5.12). |

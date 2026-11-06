@@ -1,0 +1,172 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 620" font-family="Segoe UI, Arial, sans-serif" font-size="12">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#23476b"/>
+    </marker>
+    <marker id="o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#b36b00"/>
+    </marker>
+    <style>
+      .box{fill:#fff;stroke:#23476b;stroke-width:1.2}
+      .ps{fill:#eef3f9;stroke:#1f5f99;stroke-width:1.4}
+      .pl{fill:#f3f8ef;stroke:#3d7a2a;stroke-width:1.6}
+      .cpu{fill:#fff4e0;stroke:#b36b00;stroke-width:1.4}
+      .bus{fill:#e8eef6;stroke:#23476b;stroke-width:1.4}
+      .per{fill:#fbeef6;stroke:#9b3b78;stroke-width:1.2}
+      .t{font-weight:600;font-size:13px}
+      .s{font-size:11px;fill:#333}
+      .h{font-weight:700;font-size:14px}
+      .ln{stroke:#23476b;stroke-width:1.3;fill:none}
+      .dl{stroke:#b36b00;stroke-width:1.3;fill:none;stroke-dasharray:4 3}
+    </style>
+  </defs>
+  <rect width="900" height="620" fill="#fff"/>
+
+  <!-- PC -->
+  <rect class="box" x="10" y="40" width="125" height="140" rx="6"/>
+  <text class="t" x="72" y="62" text-anchor="middle">Windows PC</text>
+  <text class="s" x="72" y="84" text-anchor="middle">ZYNQ-FORTH app 2.4+</text>
+  <text class="s" x="72" y="100" text-anchor="middle">or PuTTY, Tera Term</text>
+  <text class="s" x="72" y="116" text-anchor="middle">or tools/mforth.py</text>
+  <text class="s" x="72" y="140" text-anchor="middle">115200 Bd, 8N1</text>
+  <text class="s" x="72" y="156" text-anchor="middle">COM port = channel B</text>
+  <path class="ln" d="M135,100 L158,100" marker-end="url(#a)" marker-start="url(#a)"/>
+  <text class="s" x="147" y="92" text-anchor="middle">USB</text>
+
+  <!-- FTDI -->
+  <rect class="box" x="160" y="40" width="122" height="140" rx="6"/>
+  <text class="t" x="221" y="62" text-anchor="middle">FTDI FT2232H</text>
+  <text class="s" x="221" y="84" text-anchor="middle">channel B: UART</text>
+  <text class="s" x="221" y="100" text-anchor="middle">FPGA TX B4, RX A4</text>
+  <text class="s" x="221" y="128" text-anchor="middle">channel A: JTAG</text>
+  <text class="s" x="221" y="144" text-anchor="middle">(Arrow USB Blaster)</text>
+  <path class="ln" d="M282,80 L313,80" marker-end="url(#a)" marker-start="url(#a)"/>
+  <path class="ln" d="M282,150 L298,150" marker-end="url(#a)"/>
+
+  <!-- MAX 10 -->
+  <rect class="pl" x="300" y="20" width="445" height="580" rx="8"/>
+  <text class="h" x="522" y="42" text-anchor="middle" fill="#3d7a2a">MAX 10 10M08SAU169C8G · rtl/max1000_forth.v</text>
+
+  <!-- UART and FIFOs -->
+  <rect class="box" x="315" y="55" width="140" height="55" rx="4"/>
+  <text class="t" x="385" y="73" text-anchor="middle">uart_rx, uart_tx</text>
+  <text class="s" x="385" y="89" text-anchor="middle">417 clocks per bit</text>
+  <text class="s" x="385" y="103" text-anchor="middle">0x12 (Ctrl-R) → reset</text>
+  <rect class="box" x="315" y="120" width="67" height="50" rx="4"/>
+  <text class="t" x="348" y="142" text-anchor="middle">RX FIFO</text>
+  <text class="s" x="348" y="158" text-anchor="middle">8 KB</text>
+  <rect class="box" x="388" y="120" width="67" height="50" rx="4"/>
+  <text class="t" x="421" y="142" text-anchor="middle">TX FIFO</text>
+  <text class="s" x="421" y="158" text-anchor="middle">1 KB</text>
+  <path class="ln" d="M348,110 L348,118" marker-end="url(#a)"/>
+  <path class="ln" d="M421,120 L421,112" marker-end="url(#a)"/>
+  <path class="ln" d="M348,170 L348,188" marker-end="url(#a)"/>
+  <path class="ln" d="M421,190 L421,172" marker-end="url(#a)"/>
+
+  <!-- CPU -->
+  <rect class="cpu" x="315" y="190" width="140" height="95" rx="4"/>
+  <text class="t" x="385" y="210" text-anchor="middle">HF16 CPU</text>
+  <text class="s" x="385" y="228" text-anchor="middle">hf16_cpu.v, 48 MHz</text>
+  <text class="s" x="385" y="243" text-anchor="middle">1 instruction / clock</text>
+  <text class="s" x="385" y="258" text-anchor="middle">T + 32-entry stacks</text>
+  <text class="s" x="385" y="273" text-anchor="middle">16 × 16 multiplier</text>
+  <path class="dl" d="M315,100 L307,100 L307,237 L313,237" marker-end="url(#o)"/>
+
+  <!-- PLL, CFM, RAM -->
+  <rect class="ps" x="515" y="55" width="215" height="55" rx="4"/>
+  <text class="t" x="622" y="73" text-anchor="middle">PLL: 12 MHz in (H6)</text>
+  <text class="s" x="622" y="89" text-anchor="middle">c1 48 MHz: CPU and all logic</text>
+  <text class="s" x="622" y="103" text-anchor="middle">c0 10 MHz: ADC · c2 192 MHz: DDS</text>
+  <rect class="ps" x="515" y="120" width="215" height="52" rx="4"/>
+  <text class="t" x="622" y="137" text-anchor="middle">internal flash (CFM)</text>
+  <text class="s" x="622" y="152" text-anchor="middle">configuration + kernel image</text>
+  <text class="s" x="622" y="166" text-anchor="middle">(single image with ERAM)</text>
+  <path class="dl" d="M622,172 L622,188" marker-end="url(#o)"/>
+  <rect class="ps" x="515" y="190" width="215" height="95" rx="4"/>
+  <text class="t" x="622" y="210" text-anchor="middle">RAM 24 KB (12K × 16)</text>
+  <text class="s" x="622" y="228" text-anchor="middle">two 12K × 8 halves in 24 M9K</text>
+  <text class="s" x="622" y="243" text-anchor="middle">port A: instructions, 0–16 KB</text>
+  <text class="s" x="622" y="258" text-anchor="middle">port B: data, 0–24 KB</text>
+  <text class="s" x="622" y="273" text-anchor="middle">the kernel preloaded</text>
+  <path class="ln" d="M455,215 L513,215" marker-end="url(#a)" marker-start="url(#a)"/>
+  <text class="s" x="484" y="209" text-anchor="middle">code</text>
+  <path class="ln" d="M455,260 L513,260" marker-end="url(#a)" marker-start="url(#a)"/>
+  <text class="s" x="484" y="254" text-anchor="middle">data</text>
+
+  <!-- I/O bus -->
+  <rect class="bus" x="315" y="300" width="415" height="26" rx="4"/>
+  <text class="s" x="522" y="317" text-anchor="middle">I/O: 0x8000–0x80FF, decoded from address bits 7..1</text>
+  <path class="ln" d="M385,285 L385,298" marker-end="url(#a)" marker-start="url(#a)"/>
+  <path class="ln" d="M515,326 L515,488"/>
+  <path class="ln" d="M515,362 L507,362" marker-end="url(#a)"/>
+  <path class="ln" d="M515,362 L523,362" marker-end="url(#a)"/>
+  <path class="ln" d="M515,423 L507,423" marker-end="url(#a)"/>
+  <path class="ln" d="M515,423 L523,423" marker-end="url(#a)"/>
+  <path class="ln" d="M515,488 L507,488" marker-end="url(#a)"/>
+  <path class="ln" d="M515,488 L523,488" marker-end="url(#a)"/>
+
+  <!-- peripherals, left -->
+  <rect class="per" x="315" y="340" width="190" height="45" rx="4"/>
+  <text class="t" x="410" y="357" text-anchor="middle">GPIO ports 0 and 1</text>
+  <text class="s" x="410" y="374" text-anchor="middle">0x8010–0x801C, 2 × 16 pins</text>
+  <rect class="per" x="315" y="398" width="190" height="50" rx="4"/>
+  <text class="t" x="410" y="416" text-anchor="middle">PWM: 4 channels</text>
+  <text class="s" x="410" y="431" text-anchor="middle">0x8080, pwm.v, 48 MHz count</text>
+  <text class="s" x="410" y="445" text-anchor="middle">32-bit period, duty / 65536</text>
+  <rect class="per" x="315" y="461" width="190" height="54" rx="4"/>
+  <text class="t" x="410" y="479" text-anchor="middle">DDS</text>
+  <text class="s" x="410" y="494" text-anchor="middle">0x8060, dds.v, 32-bit phase</text>
+  <text class="s" x="410" y="508" text-anchor="middle">on c2 = 192 MHz</text>
+
+  <!-- peripherals, right -->
+  <rect class="per" x="525" y="340" width="205" height="45" rx="4"/>
+  <text class="t" x="627" y="357" text-anchor="middle">LEDs, button, ms timer</text>
+  <text class="s" x="627" y="374" text-anchor="middle">0x8000–0x800E, with the FIFOs</text>
+  <rect class="per" x="525" y="398" width="205" height="50" rx="4"/>
+  <text class="t" x="627" y="416" text-anchor="middle">ADC scanner</text>
+  <text class="s" x="627" y="431" text-anchor="middle">0x8040, adc_scan.v, c0 10 MHz</text>
+  <text class="s" x="627" y="445" text-anchor="middle">9 channels × 4 + temperature</text>
+  <rect class="per" x="525" y="461" width="205" height="54" rx="4"/>
+  <text class="t" x="627" y="479" text-anchor="middle">SPI master + CRC-32</text>
+  <text class="s" x="627" y="494" text-anchor="middle">0x8020, spi_flash.v</text>
+  <text class="s" x="627" y="508" text-anchor="middle">mode 0, 8 MHz, two selects</text>
+
+  <!-- pin router -->
+  <rect class="box" x="315" y="530" width="190" height="52" rx="4"/>
+  <text class="t" x="410" y="548" text-anchor="middle">pin router</text>
+  <text class="s" x="410" y="563" text-anchor="middle">PWM and DDS own their pins,</text>
+  <text class="s" x="410" y="576" text-anchor="middle">else latch and direction</text>
+  <path class="ln" d="M410,515 L410,528" marker-end="url(#a)"/>
+  <path class="ln" d="M315,362 L308,362 L308,556 L313,556" marker-end="url(#a)"/>
+  <path class="ln" d="M315,423 L308,423"/>
+  <path class="ln" d="M505,556 L758,556" marker-end="url(#a)" marker-start="url(#a)"/>
+  <text class="s" x="632" y="549" text-anchor="middle">23 pins, in and out</text>
+
+  <!-- board parts outside the FPGA -->
+  <rect class="box" x="760" y="120" width="130" height="52" rx="4"/>
+  <text class="t" x="825" y="138" text-anchor="middle">RESET button</text>
+  <text class="s" x="825" y="153" text-anchor="middle">= nCONFIG (E7):</text>
+  <text class="s" x="825" y="166" text-anchor="middle">reloads the FPGA</text>
+  <path class="dl" d="M760,146 L732,146" marker-end="url(#o)"/>
+  <rect class="box" x="760" y="340" width="130" height="45" rx="4"/>
+  <text class="t" x="825" y="357" text-anchor="middle">8 user LEDs</text>
+  <text class="s" x="825" y="374" text-anchor="middle">USER button (E6)</text>
+  <path class="ln" d="M730,362 L758,362" marker-end="url(#a)" marker-start="url(#a)"/>
+  <rect class="box" x="760" y="398" width="130" height="50" rx="4"/>
+  <text class="t" x="825" y="416" text-anchor="middle">analog inputs</text>
+  <text class="s" x="825" y="431" text-anchor="middle">AIN0..AIN7, AIN</text>
+  <text class="s" x="825" y="445" text-anchor="middle">0..3.3 V, 12 bits</text>
+  <path class="ln" d="M760,423 L732,423" marker-end="url(#a)"/>
+  <rect class="box" x="760" y="452" width="130" height="36" rx="4"/>
+  <text class="t" x="825" y="468" text-anchor="middle">W25Q64</text>
+  <text class="s" x="825" y="482" text-anchor="middle">serial flash, 8 MB</text>
+  <path class="ln" d="M730,470 L758,470" marker-end="url(#a)" marker-start="url(#a)"/>
+  <rect class="box" x="760" y="494" width="130" height="38" rx="4"/>
+  <text class="t" x="825" y="510" text-anchor="middle">LIS3DH</text>
+  <text class="s" x="825" y="525" text-anchor="middle">accelerometer</text>
+  <path class="ln" d="M730,506 L758,506" marker-end="url(#a)" marker-start="url(#a)"/>
+  <rect class="box" x="760" y="538" width="130" height="50" rx="4"/>
+  <text class="t" x="825" y="555" text-anchor="middle">23 digital pins</text>
+  <text class="s" x="825" y="570" text-anchor="middle">D0..D14 (header)</text>
+  <text class="s" x="825" y="583" text-anchor="middle">PIO1..PIO8 (Pmod)</text>
+</svg>

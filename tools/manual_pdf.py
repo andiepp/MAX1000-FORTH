@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Render docs/Manual.md to docs/Manual.pdf (Markdown -> HTML -> headless Edge).
+"""Render docs/Manual.md to docs/Manual.pdf, or docs/design.md to
+docs/Implementation-Details.pdf (Markdown -> HTML -> headless Edge).
 
-    python tools/manual_pdf.py [--keep-html]
+    python tools/manual_pdf.py [manual|design] [--keep-html]
 
 Needs the 'markdown' package (pip install --user markdown) and Microsoft Edge.
 """
@@ -17,9 +18,21 @@ import sys
 import markdown
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(HERE, 'docs', 'Manual.md')
-PDF = os.path.join(HERE, 'docs', 'Manual.pdf')
-HTML = os.path.join(HERE, 'build', 'Manual.html')
+
+
+def release_version():
+    """The release, as the newest heading of CHANGELOG.md names it (## 1.1 - date -> 1.1)."""
+    log = pathlib.Path(HERE, 'CHANGELOG.md').read_text(encoding='utf-8')
+    return re.search(r'^## (\d+\.\d+(?:\.\d+)?)', log, re.M).group(1)
+# source, PDF, footer and cover text, table of contents
+DOCS = {
+    'manual': dict(src='Manual.md', pdf='Manual.pdf', label='User Manual', toc=False,
+                   sub='User Manual &mdash; a 16-bit Forth CPU on the Trenz MAX1000 (Intel MAX 10)'),
+    'design': dict(src='design.md', pdf='Implementation-Details.pdf',
+                   label='Implementation Details', toc=True,
+                   sub='Implementation Details &mdash; the HF16 CPU, its memory and peripherals '
+                       'in the MAX 10, the Forth kernel and the tools'),
+}
 
 EDGE_PATHS = [
     r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe',
@@ -30,7 +43,7 @@ CSS = """
 @page {
   size: A4;
   margin: 18mm 16mm 18mm 16mm;
-  @bottom-left  { content: "MAX1000-FORTH \\2014  User Manual"; font: 8pt 'Segoe UI', sans-serif; color: #777; }
+  @bottom-left  { content: "MAX1000-FORTH \\2014  @LABEL@"; font: 8pt 'Segoe UI', sans-serif; color: #777; }
   @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 8pt 'Segoe UI', sans-serif; color: #777; }
 }
 @page :first { @bottom-left { content: none; } @bottom-right { content: none; } }
@@ -46,8 +59,16 @@ h1 { font-size: 20pt; color: #1f5f99; border-bottom: 2px solid #1f5f99; padding-
 h2 { font-size: 15pt; color: #1f5f99; border-bottom: 1px solid #c8d6e5; padding-bottom: 1mm;
      margin-top: 9mm; page-break-before: always; }
 h3 { font-size: 12pt; color: #23476b; margin-top: 6mm; }
-h2, h3 { page-break-after: avoid; break-after: avoid; }
-h1 + p, h2 + p, h3 + p { break-before: avoid; }
+h4 { font-size: 10.5pt; color: #23476b; margin-top: 5mm; }
+h2, h3, h4 { page-break-after: avoid; break-after: avoid; }
+h1 + p, h2 + p, h3 + p, h4 + p { break-before: avoid; }
+.toc { page-break-after: always; }
+.toc h2 { page-break-before: avoid; margin-top: 0; }
+.toc ul { list-style: none; padding-left: 0; margin: 0; }
+.toc ul ul { padding-left: 7mm; }
+.toc > ul > li { margin-top: 2.2mm; font-weight: 600; }
+.toc > ul > li li { font-weight: normal; margin: 0.4mm 0; }
+img[src$=".svg"] { border: none; }
 
 a { color: #1f5f99; text-decoration: none; }
 code { font-family: Consolas, 'Courier New', monospace; font-size: 9pt;
@@ -69,13 +90,23 @@ li { margin: 0.6mm 0; }
 """
 
 
-def build_html(md_text):
+def build_html(md_text, doc):
     # The Markdown's own title becomes the cover page
     lines = md_text.splitlines()
     if lines and lines[0].startswith('# '):
         lines = lines[1:]
-    body = markdown.markdown('\n'.join(lines),
-                             extensions=['tables', 'fenced_code', 'toc', 'sane_lists'])
+    # GitHub needs '\|' for a pipe inside a code span in a table; Python-Markdown keeps the
+    # backslash there, and needs no escape
+    text = re.sub(r'`[^`\n]*`', lambda m: m.group(0).replace('\\|', '|'), '\n'.join(lines))
+    md = markdown.Markdown(extensions=['tables', 'fenced_code', 'toc', 'sane_lists'],
+                           extension_configs={'toc': {'toc_depth': '2-3'}})
+    body = md.convert(text)
+    if doc['toc']:
+        # md.toc is <div class="toc"><ul>...</ul></div>: give it a heading of its own and put
+        # it after the introduction, before the first chapter
+        toc = md.toc.replace('<div class="toc">', '<div class="toc"><h2>Contents</h2>', 1)
+        first = body.find('<h2')
+        body = body[:first] + toc + body[first:]
     today = datetime.date.today().isoformat()
     # The HTML is written to build/, so images referenced relative to docs/ get absolute paths
     body = re.sub(r'src="(?!\w+:)([^"]+)"',
@@ -83,36 +114,42 @@ def build_html(md_text):
     cover = f"""
 <div class="cover">
   <h1>MAX1000-FORTH</h1>
-  <div class="sub">User Manual &mdash; a 16-bit Forth CPU on the Trenz MAX1000 (Intel MAX 10)</div>
-  <div class="meta">MAX1000-FORTH 1.1<br>Generated {today} from docs/Manual.md</div>
+  <div class="sub">{doc['sub']}</div>
+  <div class="meta">MAX1000-FORTH {release_version()}<br>Generated {today} from docs/{doc['src']}</div>
 </div>"""
+    css = CSS.replace('@LABEL@', doc['label'])
     return (f'<!doctype html><html><head><meta charset="utf-8">'
-            f'<title>MAX1000-FORTH User Manual</title><style>{CSS}</style></head>'
+            f'<title>MAX1000-FORTH {doc["label"]}</title><style>{css}</style></head>'
             f'<body>{cover}{body}</body></html>')
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('--keep-html', action='store_true', help='keep build/Manual.html')
+    ap.add_argument('doc', nargs='?', choices=sorted(DOCS), default='manual')
+    ap.add_argument('--keep-html', action='store_true', help='keep the HTML in build/')
     args = ap.parse_args()
+    doc = DOCS[args.doc]
+    src = os.path.join(HERE, 'docs', doc['src'])
+    pdf = os.path.join(HERE, 'docs', doc['pdf'])
+    html_path = os.path.join(HERE, 'build', doc['pdf'].replace('.pdf', '.html'))
 
     edge = next((p for p in EDGE_PATHS if os.path.exists(p)), None)
     if not edge:
         sys.exit('Microsoft Edge not found')
 
-    with open(SRC, encoding='utf-8') as f:
-        html = build_html(f.read())
-    os.makedirs(os.path.dirname(HTML), exist_ok=True)
-    with open(HTML, 'w', encoding='utf-8') as f:
+    with open(src, encoding='utf-8') as f:
+        html = build_html(f.read(), doc)
+    os.makedirs(os.path.dirname(html_path), exist_ok=True)
+    with open(html_path, 'w', encoding='utf-8') as f:
         f.write(html)
 
-    url = 'file:///' + HTML.replace('\\', '/')
+    url = 'file:///' + html_path.replace('\\', '/')
     subprocess.run([edge, '--headless=new', '--disable-gpu', '--no-pdf-header-footer',
-                    '--no-first-run', f'--print-to-pdf={PDF}', url],
+                    '--no-first-run', f'--print-to-pdf={pdf}', url],
                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120)
     if not args.keep_html:
-        os.remove(HTML)
-    print(f'wrote {PDF} ({os.path.getsize(PDF) // 1024} KB)')
+        os.remove(html_path)
+    print(f'wrote {pdf} ({os.path.getsize(pdf) // 1024} KB)')
 
 
 if __name__ == '__main__':

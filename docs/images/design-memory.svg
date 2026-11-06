@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 590" font-family="Segoe UI, Arial, sans-serif" font-size="12">
+  <defs>
+    <style>
+      .a{font-family:Consolas,monospace;font-size:11px;fill:#23476b}
+      .t{font-weight:600;font-size:12px}
+      .s{font-size:11px;fill:#333}
+      .h{font-weight:700;font-size:14px}
+      .k{fill:#fff4e0;stroke:#b36b00;stroke-width:1.2}
+      .u{fill:#fff;stroke:#23476b;stroke-width:1.2}
+      .m{fill:#f4f4f4;stroke:#999;stroke-width:1;stroke-dasharray:4 3}
+      .io{fill:#f3f8ef;stroke:#3d7a2a;stroke-width:1.2}
+      .n{fill:#e3f0dc;stroke:#3d7a2a;stroke-width:1.2}
+      .d{fill:#fbeef6;stroke:#9b3b78;stroke-width:1.2}
+      .g{fill:#eef3f9;stroke:#1f5f99;stroke-width:1.2}
+      .ln{stroke:#23476b;stroke-width:1.3;fill:none}
+    </style>
+  </defs>
+  <rect width="820" height="590" fill="#fff"/>
+  <text class="h" x="220" y="22" text-anchor="middle">Byte addresses, as the CPU sees them</text>
+  <text class="h" x="620" y="22" text-anchor="middle">I/O registers (16 bits each)</text>
+
+  <!-- reach of code and data -->
+  <path class="ln" d="M26,40 L34,40 L34,230 L26,230"/>
+  <text class="s" x="22" y="135" transform="rotate(-90 22 135)" text-anchor="middle">PC, jumps, calls: 0000–3FFF</text>
+  <path class="ln" d="M52,40 L60,40 L60,410 L52,410"/>
+  <text class="s" x="48" y="225" transform="rotate(-90 48 225)" text-anchor="middle">loads and stores (RAM): 0000–5FFF</text>
+
+  <!-- left column -->
+  <rect class="k" x="120" y="40" width="200" height="24"/>
+  <text class="t" x="220" y="56" text-anchor="middle">jump cold (reset vector)</text>
+  <text class="a" x="112" y="52" text-anchor="end">0000</text>
+  <rect class="k" x="120" y="64" width="200" height="80"/>
+  <text class="t" x="220" y="96" text-anchor="middle">kernel: code, headers, data</text>
+  <text class="s" x="220" y="114" text-anchor="middle">10,244 bytes, 323 words</text>
+  <text class="s" x="220" y="130" text-anchor="middle">part of the FPGA configuration</text>
+  <text class="a" x="112" y="76" text-anchor="end">0002</text>
+  <rect class="u" x="120" y="144" width="200" height="86"/>
+  <text class="t" x="220" y="176" text-anchor="middle">your words</text>
+  <text class="s" x="220" y="194" text-anchor="middle">HERE grows upward</text>
+  <text class="s" x="220" y="210" text-anchor="middle">6,140 bytes free (unused)</text>
+  <text class="a" x="112" y="156" text-anchor="end">2804</text>
+  <text class="a" x="112" y="228" text-anchor="end">3FFF</text>
+  <rect class="d" x="120" y="230" width="200" height="70"/>
+  <text class="t" x="220" y="258" text-anchor="middle">data RAM (buffer:)</text>
+  <text class="s" x="220" y="274" text-anchor="middle">7,168 bytes (unused-data)</text>
+  <text class="s" x="220" y="290" text-anchor="middle">data only, no code</text>
+  <text class="a" x="112" y="242" text-anchor="end">4000</text>
+  <rect class="k" x="120" y="300" width="200" height="110"/>
+  <text class="t" x="220" y="318" text-anchor="middle">kernel buffers</text>
+  <text class="s" x="220" y="336" text-anchor="middle">5C00 pbuf 256 · 5D00 tib 82</text>
+  <text class="s" x="220" y="352" text-anchor="middle">5D60 rq 64 · 5DA0 sbuf 64</text>
+  <text class="s" x="220" y="368" text-anchor="middle">5DE0 ssnap 40 · 5E10 hdr 16</text>
+  <text class="s" x="220" y="384" text-anchor="middle">5E20–5EFF not used</text>
+  <text class="s" x="220" y="400" text-anchor="middle">5F00 lbuf 256</text>
+  <text class="a" x="112" y="312" text-anchor="end">5C00</text>
+  <text class="a" x="112" y="408" text-anchor="end">5FFF</text>
+  <rect class="m" x="120" y="410" width="200" height="50"/>
+  <text class="s" x="220" y="432" text-anchor="middle">no RAM: stores ignored,</text>
+  <text class="s" x="220" y="448" text-anchor="middle">reads undefined</text>
+  <text class="a" x="112" y="422" text-anchor="end">6000</text>
+  <text class="a" x="112" y="458" text-anchor="end">7FFF</text>
+  <rect class="io" x="120" y="460" width="200" height="30"/>
+  <text class="t" x="220" y="480" text-anchor="middle">I/O registers</text>
+  <text class="a" x="112" y="472" text-anchor="end">8000</text>
+  <rect class="m" x="120" y="490" width="200" height="50"/>
+  <text class="s" x="220" y="512" text-anchor="middle">the I/O map again</text>
+  <text class="s" x="220" y="528" text-anchor="middle">every 256 bytes</text>
+  <text class="a" x="112" y="502" text-anchor="end">8100</text>
+  <text class="a" x="112" y="538" text-anchor="end">FFFF</text>
+  <path class="ln" d="M320,475 L360,475 L360,40 L436,40"/>
+
+  <!-- right column: I/O registers -->
+  <rect class="n" x="440" y="40" width="360" height="26"/>
+  <text class="a" x="452" y="57">8000</text><text class="s" x="500" y="57">terminal: RX byte (a read takes it) / TX byte</text>
+  <rect class="n" x="440" y="66" width="360" height="26"/>
+  <text class="a" x="452" y="83">8002</text><text class="s" x="500" y="83">status: RX byte waiting, TX room, TX idle</text>
+  <rect class="io" x="440" y="92" width="360" height="26"/>
+  <text class="a" x="452" y="109">8004</text><text class="s" x="500" y="109">LED1..LED8</text>
+  <rect class="io" x="440" y="118" width="360" height="26"/>
+  <text class="a" x="452" y="135">8006</text><text class="s" x="500" y="135">USER button (sampled every 10 ms)</text>
+  <rect class="io" x="440" y="144" width="360" height="26"/>
+  <text class="a" x="452" y="161">8008</text><text class="s" x="500" y="161">restart: a write resets the CPU, like Ctrl-R</text>
+  <rect class="io" x="440" y="170" width="360" height="26"/>
+  <text class="a" x="452" y="187">800A</text><text class="s" x="500" y="187">millisecond counter (16 bits)</text>
+  <rect class="n" x="440" y="196" width="360" height="26"/>
+  <text class="a" x="452" y="213">800C</text><text class="s" x="500" y="213">RX peek: the next byte, not taken</text>
+  <rect class="n" x="440" y="222" width="360" height="26"/>
+  <text class="a" x="452" y="239">800E</text><text class="s" x="500" y="239">bytes waiting in the RX FIFO</text>
+  <rect class="g" x="440" y="248" width="360" height="26"/>
+  <text class="a" x="452" y="265">8010</text><text class="s" x="500" y="265">port 0: +0 levels, +2 latch, +4 direction</text>
+  <rect class="g" x="440" y="274" width="360" height="26"/>
+  <text class="a" x="452" y="291">8018</text><text class="s" x="500" y="291">port 1: the same (PIO1..PIO8)</text>
+  <rect class="k" x="440" y="300" width="360" height="26"/>
+  <text class="a" x="452" y="317">8020</text><text class="s" x="500" y="317">SPI data · +2 select / status · +4, +6 CRC</text>
+  <rect class="k" x="440" y="326" width="360" height="26"/>
+  <text class="a" x="452" y="343">8028</text><text class="s" x="500" y="343">CRC-32 bits 15..0, then 31..16 at 802A</text>
+  <rect class="d" x="440" y="352" width="360" height="26"/>
+  <text class="a" x="452" y="369">8040</text><text class="s" x="500" y="369">ADC channels 0..8 (8040 + 2c), 12 bits</text>
+  <rect class="d" x="440" y="378" width="360" height="26"/>
+  <text class="a" x="452" y="395">8052</text><text class="s" x="500" y="395">temperature diode (64-sample average)</text>
+  <rect class="u" x="440" y="404" width="360" height="26"/>
+  <text class="a" x="452" y="421">8060</text><text class="s" x="500" y="421">DDS: tuning low, high (8062), control (8064)</text>
+  <rect class="u" x="440" y="430" width="360" height="26"/>
+  <text class="a" x="452" y="447">8080</text><text class="s" x="500" y="447">PWM c at 8080 + 8c: period lo, hi, duty, control</text>
+  <rect class="m" x="440" y="456" width="360" height="26"/>
+  <text class="a" x="452" y="473">80A0</text><text class="s" x="500" y="473">… 80FF: nothing (reads 0)</text>
+
+  <text class="s" x="440" y="506">Only address bits 7..1 are decoded. Stores are decoded from</text>
+  <text class="s" x="440" y="522">mem_addr; reads from io_addr, the address registered one clock</text>
+  <text class="s" x="440" y="538">earlier. Unused registers read 0 and ignore writes.</text>
+</svg>

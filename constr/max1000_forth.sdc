@@ -15,7 +15,7 @@ set_clock_groups -asynchronous \
 set_false_path -from [get_ports {USER_BTN UART_RXD D[*] PIO[*]}]
 set_false_path -to   [get_ports {LED[*] UART_TXD D[*] PIO[*]}]
 
-# Serial flash at SCK = 10 MHz: MISO is sampled two CPU clocks (50 ns) after the falling
-# edge that changes it, MOSI changes two clocks before the rising edge; far from critical.
+# SPI (flash, LIS3DH) at SCK = CPU clock / 6 = 8 MHz: MISO is sampled three CPU clocks (62.5 ns) after the falling
+# edge that changes it, MOSI changes three clocks before the rising edge; far from critical.
 set_false_path -from [get_ports {F_DO SEN_SDO}]
 set_false_path -to   [get_ports {F_S F_CLK F_DI SEN_CS SEN_SPC SEN_SDI}]
