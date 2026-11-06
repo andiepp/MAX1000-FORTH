@@ -31,18 +31,25 @@ straight to the board's USB serial port.
 2. Install the **Arrow USB Blaster** driver (the MAX1000 has its programmer on board, so no
    other hardware is needed) and the **Quartus Prime Programmer** (or Quartus Prime Lite,
    which contains it).
-3. Plug in the MAX1000 and write MAX1000-FORTH into its flash:
+3. Plug in the MAX1000 and write MAX1000-FORTH into its flash, once (in PowerShell, in the
+   unpacked folder):
 
    ```powershell
    .\firmware\program_flash.ps1          # internal flash: starts at every power-up
    .\firmware\program_flash.ps1 -Sram    # or only until power-off
    ```
 
-4. Open the board's second serial port (the FTDI's channel B) at **115200 8N1** in a
-   terminal or the MAX1000-FORTH app (`app\Max1000Forth.exe`), press Enter, and type Forth.
-   The app from the release zip runs as it is; the one from Code → Download ZIP is the small
-   build and needs Microsoft's free .NET 10 Desktop Runtime (Windows offers it on the first
-   start).
+   Writing the flash takes a while (up to a few minutes); the script says when it is done.
+   Then press the board's **Reset** button: LED1 lights up.
+4. Start the **MAX1000-FORTH app**: `app\Max1000Forth.exe`. Choose the board's serial port
+   (the second of the two the MAX1000 brings, the FTDI's channel B), click **Connect**, and
+   type Forth into the input line under the terminal. The app also shows the data stack, the
+   dictionary, the saved source and a live view of the board; **F1** opens the manual. The
+   app from the release zip runs as it is; the one from Code → Download ZIP is the small build
+   and needs Microsoft's free .NET 10 Desktop Runtime (Windows offers it on the first start).
+
+   Or use any terminal program (PuTTY, Tera Term) on the same port at **115200 8N1**, press
+   Enter, and type Forth:
 
    ```
    HF16 Forth on MAX1000
