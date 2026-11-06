@@ -35,7 +35,7 @@ module max1000_forth #(
     localparam integer CLK_HZ = 12_000_000 * PLL_MUL / PLL_DIV;
 
     // ------------------------------------------------------------------
-    // Clocks: c0 = 10 MHz for the ADC, c1 = CPU clock
+    // Clocks: c0 = 10 MHz for the ADC, c1 = CPU clock, c2 = 192 MHz for the DDS
     // ------------------------------------------------------------------
     wire [4:0] pll_clk;
     wire       pll_locked;
@@ -49,6 +49,10 @@ module max1000_forth #(
         .clk1_duty_cycle         (50),
         .clk1_multiply_by        (PLL_MUL),
         .clk1_phase_shift        ("0"),
+        .clk2_divide_by          (1),                 // c2 = 192 MHz for the DDS
+        .clk2_duty_cycle         (50),
+        .clk2_multiply_by        (16),
+        .clk2_phase_shift        ("0"),
         .compensate_clock        ("CLK1"),
         .inclk0_input_frequency  (83333),
         .intended_device_family  ("MAX 10"),
@@ -61,7 +65,7 @@ module max1000_forth #(
         .port_locked             ("PORT_USED"),
         .port_clk0               ("PORT_USED"),
         .port_clk1               ("PORT_USED"),
-        .port_clk2               ("PORT_UNUSED"),
+        .port_clk2               ("PORT_USED"),
         .port_clk3               ("PORT_UNUSED"),
         .port_clk4               ("PORT_UNUSED"),
         .width_clock             (5)
@@ -239,17 +243,35 @@ module max1000_forth #(
         .rdata(pwm_rdata), .enable(pwm_en), .pin(pwm_pin), .out(pwm_level)
     );
 
-    reg [31:0] pwm_owns, pwm_value;
+    // DDS square wave at 0x8060 (rtl/dds.v), on its own 192 MHz clock; like a PWM channel it
+    // owns its pin while it is on
+    wire [15:0] dds_rdata;
+    wire        dds_en, dds_out;
+    wire [5:0]  dds_pin;
+    wire        io_dds = mem_addr[7:5] == 3'b011;          // 0x8060..0x807F
+
+    dds dds_unit (
+        .clk(clk), .rst(cpu_rst), .we(io_store && io_dds),
+        .reg_sel(mem_addr[2:1]), .rd_sel(io_addr[2:1]), .wdata(mem_wdata), .rdata(dds_rdata),
+        .dds_clk(pll_clk[2]), .out(dds_out), .enable(dds_en), .pin(dds_pin)
+    );
+
+    reg [31:0] pwm_owns, pwm_value;                         // PWM channels and the DDS
     integer    p, q;
     always @* begin
         pwm_owns  = 32'd0;
         pwm_value = 32'd0;
-        for (p = 0; p < 32; p = p + 1)
+        for (p = 0; p < 32; p = p + 1) begin
             for (q = 0; q < PWM_CH; q = q + 1)
                 if (pwm_en[q] && pwm_pin[6*q +: 6] == p) begin
                     pwm_owns[p]  = 1'b1;
                     pwm_value[p] = pwm_value[p] | pwm_level[q];
                 end
+            if (dds_en && dds_pin == p) begin
+                pwm_owns[p]  = 1'b1;
+                pwm_value[p] = pwm_value[p] | dds_out;
+            end
+        end
     end
 
     wire [31:0] pin_drive = (pin_dir | pwm_owns) & pin_exists;
@@ -305,6 +327,7 @@ module max1000_forth #(
     //   0x8010 + 8p     port p (0..1): +0 pin levels, +2 output latch, +4 direction
     //   0x8020..0x802A  SPI (flash, accelerometer) and CRC-32
     //   0x8040 + 2c     ADC channel c (0..8), 12-bit code; 0x8052 temperature diode
+    //   0x8060..0x8064  DDS: tuning low/high, control (rtl/dds.v)
     //   0x8080 + 8c     PWM channel c: +0/+2 period, +4 duty, +6 control (rtl/pwm.v)
     // ------------------------------------------------------------------
     reg [15:0] io_rdata;
@@ -338,8 +361,10 @@ module max1000_forth #(
     end
 
     always @* begin
-        if (io_addr[7:6] == 2'b01)
+        if (io_addr[7:5] == 3'b010)
             io_rdata = (io_addr[5:1] <= 5'd9) ? {4'd0, adc_code} : 16'd0;
+        else if (io_addr[7:5] == 3'b011)
+            io_rdata = dds_rdata;
         else if (io_addr[7:5] == 3'b100)
             io_rdata = pwm_rdata;
         else if (io_addr[7:4] == 4'h2)

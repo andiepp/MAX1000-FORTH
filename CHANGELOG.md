@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1 — unreleased
+
+- **DDS square wave** on any pin (after ZYNQ-FPGA-FORTH32): a 32-bit phase accumulator on
+  its own 192 MHz clock, 0.0447 Hz steps, edges on a 5.2 ns grid; `dds-hz`, `dds-khz`,
+  `dds-tuning`, `dds-pin`, `dds-off` (registers at 0x8060). The `board` answer gets a
+  `dds` line and counts the DDS pin as driven. About 200 logic elements, no RAM.
+- The ADC now decodes only 0x8040..0x805F.
+
 ## 1.0 — 2026-11-05
 
 The first release: the HF16 Forth of [ZYNQ-FORTH](https://github.com/andiepp/ZYNQ-FORTH),

@@ -480,8 +480,8 @@ The instruction encoding is described in ZYNQ-FORTH's `docs/design.md`; it is th
 | Address | Content |
 |---|---|
 | `$0000` | jump to `cold` (start-up) |
-| `$0002`–`$26A7` | the kernel: 314 words with their headers and variables |
-| `$26A8`–`$3FFF` | free for your definitions (6,488 bytes). `here` shows the next free byte, `unused` how much is left |
+| `$0002`–`$2803` | the kernel: 323 words with their headers and variables |
+| `$2804`–`$3FFF` | free for your definitions (6,140 bytes). `here` shows the next free byte, `unused` how much is left |
 | `$4000`–`$5BFF` | data RAM for `buffer:` (7,168 bytes); `unused-data` shows how much is left |
 | `$5C00`–`$5FFF` | the kernel's buffers (below; `$5E20`–`$5EFF` is not used) |
 | `$6000`–`$7FFF` | no RAM; stores there are ignored |
@@ -525,10 +525,11 @@ The I/O registers can also be read and written directly with `@` and `!`:
 | `$8026` | – | add the low byte to the CRC |
 | `$8028`, `$802A` | CRC-32, bits 15..0 and 31..16 | – |
 | `$8040`–`$8052` | ADC channels 0..8 and the temperature diode (slot 9), 12 bits | – |
+| `$8060`–`$8064` | DDS: tuning low, high, control (section 5.13) | DDS registers |
 | `$8080`–`$809E` | PWM channels 0..3 (section 5.13) | PWM registers |
 
-Section 5.11 explains the ports, 5.12 the ADC, 5.13 the PWM registers and 5.15 the SPI and
-CRC registers.
+Section 5.11 explains the ports, 5.12 the ADC, 5.13 the PWM and DDS registers and 5.15 the
+SPI and CRC registers.
 
 ### 4.4 Dictionary entries
 
@@ -663,7 +664,7 @@ The details are in [design.md](design.md). There is no HASE mode on the MAX1000.
 
 ## 5. Word reference
 
-The kernel has 314 words. About a third of them are internal: they serve the interpreter,
+The kernel has 323 words. About a third of them are internal: they serve the interpreter,
 the compiler, the saved source and the app's requests (sections 5.22 and 5.23). Where a
 word differs from standard Forth, its entry says so.
 
@@ -805,7 +806,7 @@ New definitions and data are added at `here`, the next free byte of the code spa
 | `buffer: name` | `( n "name" -- )` | Reserve n bytes of data RAM (rounded up to even, so cells stay aligned); `name` then pushes their address. ` data RAM full` if fewer than n bytes are left. |
 | `unused-data` | `( -- n )` | Free data RAM in bytes. |
 
-A fresh kernel leaves 6,488 bytes of code space and 7,168 bytes of data RAM. `buffer:`
+A fresh kernel leaves 6,140 bytes of code space and 7,168 bytes of data RAM. `buffer:`
 rounds odd sizes up, so every buffer starts at an even address. The data RAM is not cleared, and a restart frees all of it, together with the
 words that named the buffers.
 
@@ -977,7 +978,7 @@ converter samples each channel four times in a row and keeps only the last resul
 diode, −40 °C = 3798 and 96 °C = 3510, so it is approximate: expect a few degrees of error.
 It is the die temperature, typically somewhat above the room.
 
-### 5.13 PWM
+### 5.13 PWM and DDS
 
 Four PWM channels, 0..3, make square waves of variable frequency and duty cycle in the
 FPGA, independently of Forth: once set, a channel runs on its own, also while Forth
@@ -1031,6 +1032,48 @@ duty × 3.3 V, which the ADC reads (section 6.4).
 
 ```
 1000 0 pwm-hz  0 pwm @ u. 48000  ok
+```
+
+**DDS.** For a square wave of an exact, finely set frequency there is a DDS (direct digital
+synthesis) generator: a 32-bit phase accumulator on its own 192 MHz clock, whose top bit is
+the output. It drives **any digital pin**, like a PWM channel, and runs on its own once set.
+
+| Word | Stack | Description |
+|---|---|---|
+| `dds-hz` | `( u -- )` | Frequency in Hz, 0..65535. |
+| `dds-khz` | `( u -- )` | Frequency in kHz, 0..65535 (up to 65.5 MHz). |
+| `dds-tuning` | `( ud -- )` | The phase step directly: f = ud × 192 MHz / 2³² (low cell, then high cell). |
+| `dds-pin` | `( pin -- )` | Route the DDS to the pin and start it at phase 0; ` bad pin` for numbers that are not pins. |
+| `dds-off` | `( -- )` | Stop it; the pin returns to its own latch and direction. |
+| `dds-sync` | `( -- )` | Wait until the generator has taken over the last change (the others do this themselves). |
+
+The frequency resolution is 192 MHz / 2³² = 0.0447 Hz, so `1 dds-hz` gives 0.98 Hz and
+`1000 dds-hz` 1000.01 Hz: the error is below 0.05 Hz everywhere, which matters only at very low
+frequencies. The edges fall on a 5.2 ns grid. A frequency that does not divide 192 MHz
+evenly is therefore made of periods that differ by one 5.2 ns step, which averages to the exact
+value (at 1 MHz: ±0.5 % jitter per period, at 10 MHz ±5 %). Above about 20 MHz the
+shape is limited by the pin and its wiring. A change of frequency takes effect at once and
+keeps the phase running, so a sweep has no gaps; `dds-pin` restarts the phase.
+
+```
+1000 dds-hz  3 dds-pin        \ D3: 1 kHz
+1500 dds-khz                  \ now 1.5 MHz
+dds-off
+```
+
+`dds-hz` and `dds-khz` compute the phase step hz × 2³² / 192,000,000 = hz × 2²⁰ / 46875 by
+long division, 16 bits at a time with `um/mod`, and round it (`(dds-hz) ( ud -- )` takes the
+frequency in Hz as a double number; `dds-d` is the constant 46875). The DDS and a PWM channel on the same pin are ORed. The
+DDS registers are at `$8060`:
+
+| Address | Register |
+|---|---|
+| `$8060` | tuning, low 16 bits (taken when the high half is written) |
+| `$8062` | tuning, high 16 bits; writing it sets the frequency |
+| `$8064` | bit 15 = on, bits 5..0 = pin number; read: bit 14 = a change not yet taken over |
+
+```
+1000 dds-hz  $8060 @ hex . decimal 5762  ok
 ```
 
 ### 5.14 Accelerometer
@@ -1370,7 +1413,7 @@ the answer. The others build answers and exist for the app's protocol only: `ans
 `answer-n`, `refuse`, `rq-word`, `rq-c`, `rq=`, `=s`, `hexnum`, `hexd`, `hex4`, `hex8`,
 `lf`, `noop`, `on/off`, the request words `rq-restart`, `rq-source`, `rq-store`,
 `rq-autostart`, the payload words `p-echo`, `p-version`, `p-status`, `p-words`, `p-stack`,
-`p-board`, `p-source`, the helpers `pwm-ctl`, `pwm-own`, `port-word`, `pwm-word`,
+`p-board`, `p-source`, the helpers `pwm-ctl`, `pwm-own`, `dds-own`, `port-word`, `pwm-word`,
 `tx-idle`, and the variables and buffers `serving`, `counting`, `acount`, `rq`, `rq#`,
 `rq>`, `rqn-a`, `rqn-n`, `ea`, `en`, `rlen`, `rclo`, `rchi`, `rflag`, `pp`.
 
@@ -1543,6 +1586,20 @@ breathe
 0 pwm-off
 ```
 prints about 825 and 2475 mV: the filter turns the duty cycle into a share of 3.3 V.
+
+**A DDS frequency, counted by Forth.** The pin's level can be read while the DDS drives it, so
+Forth can count the edges itself (good up to some tens of kHz):
+```forth
+variable epin  variable elast  variable ecount
+: edges ( pin ms -- n )   \ level changes on the pin within ms milliseconds
+  swap epin ! 0 ecount ! epin @ pin@ elast !
+  ms@ + begin
+    epin @ pin@ dup elast @ <> if 1 ecount +! then elast !
+    dup ms@ - 0<
+  until drop ecount @ ;
+1000 dds-hz  3 dds-pin  3 1000 edges .  dds-off
+```
+prints about 2000 (two edges per period; on the board it printed 2001).
 
 ### 6.5 A buffer in the data RAM
 

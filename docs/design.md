@@ -20,6 +20,7 @@ answers the app; on the MAX1000 the kernel does both itself.
         8 user LEDs, user button, ms timer ───────────────┤
         23 digital pins: D0..D14, PIO1..PIO8 ─────────────┤
         PWM: 4 channels on any pin (rtl/pwm.v) ───────────┤
+        DDS square wave, 192 MHz (rtl/dds.v) ─────────────┤
         ADC: 9 inputs + temperature diode (rtl/adc_scan.v)┤
         SPI master + CRC-32 (rtl/spi_flash.v) ────────────┴── W25Q64 serial flash (8 MB)
                                                          └── LIS3DH accelerometer
@@ -31,6 +32,7 @@ answers the app; on the MAX1000 the kernel does both itself.
 | `rtl/max1000_forth.v` | top level: PLL, reset, RAM, UART, FIFOs, I/O registers, pins |
 | `rtl/fifo_bram.v`, `rtl/uart.v` | FIFOs in block RAM, UART transmitter and receiver |
 | `rtl/pwm.v` | four PWM channels (from ZYNQ-FORTH, separate read select) |
+| `rtl/dds.v` | DDS square-wave generator on its own 192 MHz clock (after ZYNQ-FPGA-FORTH32) |
 | `rtl/adc_scan.v` | ADC scanner around Intel's Modular ADC control core |
 | `rtl/spi_flash.v` | SPI master for flash and accelerometer, CRC-32 unit |
 | `constr/max1000_forth.sdc` | timing constraints |
@@ -109,7 +111,7 @@ address), which is what allows 48 MHz.
 
 | Part | Implementation |
 |---|---|
-| Clock | 12 MHz oscillator (H6) → PLL: c1 = 48 MHz CPU clock (× 4), c0 = 10 MHz for the ADC (× 5 / 6) |
+| Clock | 12 MHz oscillator (H6) → PLL: c1 = 48 MHz CPU clock (× 4), c0 = 10 MHz for the ADC (× 5 / 6), c2 = 192 MHz for the DDS (× 16) |
 | Reset | held until the PLL locks plus 255 clocks. **Ctrl-R** (0x12) from the host, or a store to 0x8008, resets the CPU, the FIFOs, the SPI master, PWM and the I/O registers; the 0x12 is not passed on. The RAM keeps its contents |
 | RAM | 12K × 16 as two 12K × 8 halves in M9K blocks (byte stores without byte enables); port A fetches instructions, port B is the data port. Both are initialized from `build/forth_lo.hex` / `forth_hi.hex` (`$readmemh`) |
 | Configuration | the MAX 10 loads from its internal flash in mode "single image with ERAM", so the `.pof` carries the RAM contents (the kernel) |
@@ -129,7 +131,7 @@ accelerometer on, prints the banner, lights LED1 and runs `autoload`, then `quit
 | Address | Content |
 |---|---|
 | 0x0000 | reset vector: jump to `cold` |
-| 0x0002.. | kernel: code, headers, variables (about 9.9 KB) |
+| 0x0002.. | kernel: code, headers, variables (about 10.2 KB) |
 | … `here` | user dictionary, grows up to 0x3FFF (`unused` shows what is left) |
 | 0x4000–0x5BFF | data RAM, handed out by `buffer:` (`unused-data`) |
 | 0x5C00 | `pbuf`, 256 bytes: one flash page for `store` |
@@ -168,6 +170,9 @@ copied into new definitions by the compiler up to their EXIT.
 | 0x8028, 0x802A | CRC-32 bits 15..0, 31..16 | – |
 | 0x8040 + 2c | ADC channel c (0..8), 12-bit code | – |
 | 0x8052 | temperature diode, 12-bit code (64-sample average) | – |
+| 0x8060 | DDS: tuning, low 16 bits | same (held until the high half is written) |
+| 0x8062 | DDS: tuning, high 16 bits | same (takes both halves) |
+| 0x8064 | DDS: bit 15 on, bit 14 busy (a change not yet taken over), bits 5..0 pin | bit 15 on, bits 5..0 pin |
 | 0x8080 + 8c | PWM channel c: period low 16 bits | same (held until the high half is written) |
 | 0x8082 + 8c | PWM channel c: period high 16 bits (48 MHz clocks per cycle, at least 2) | same (takes both halves) |
 | 0x8084 + 8c | PWM channel c: duty in 1/65536 of the period, 0xFFFF = always high | same |
@@ -200,6 +205,23 @@ owns its pin: the pin becomes an output with the channel's level (channels on th
 are ORed); disabled, the pin returns to its latch and direction. A CPU reset turns every
 channel off. The ISS keeps the registers but has no time base: a PWM pin reads high there
 only at full duty.
+
+### DDS
+
+`rtl/dds.v` (after ZYNQ-FPGA-FORTH32's DDS) is a 32-bit phase accumulator on PLL output c2,
+192 MHz. Its top bit is a square wave: f = tuning × 192 MHz / 2³², in steps of 0.0447 Hz,
+with edges on the 5.2 ns grid (periods that do not divide 192 MHz evenly alternate by one
+step). The CPU side holds the tuning word (low half held until the high half is written) and
+the control word (bit 15 on, bits 5..0 pin). A change crosses to the 192 MHz clock through a
+toggle handshake; one written while the previous is in flight is sent again afterwards, so
+the last value always arrives, and bit 14 of the control register reads busy until then.
+Turning it on starts the phase at 0; a new tuning word keeps the phase running. Like a PWM
+channel it owns its pin while on (ORed with a PWM channel on the same pin), and a CPU reset
+turns it off. The kernel computes the tuning word as hz × 2²⁰ / 46875 (= hz × 2³² /
+192,000,000) by long division with `um/mod`, rounded. About 200 logic elements, no RAM.
+The 32-bit adder meets 192 MHz with about 1.2 ns of slack. The ISS models the registers and
+the pin ownership, not the waveform. On the board, Forth counting the edges on the pin
+it drives (`pin@`) measured 200 / 2001 / 20010 edges per second at 100 Hz / 1 kHz / 10 kHz.
 
 ### ADC and temperature
 
@@ -301,7 +323,7 @@ per byte; an unfinished one is dropped.
 | `echo`, `words`, `stack`, `source`, `erase`, `autostart on\|off` | as ZYNQ-FORTH |
 | `version` | `firmware max1000-forth 1.0`, `protocol 1`, `kernel <cells> <sum hex>` (KCHECK: the image's cell sum, set by the cross-compiler) |
 | `status` | as ZYNQ-FORTH; `pc` is always 0000; `input` = RX FIFO bytes plus the rest of a saved source being read; the source fields come from the cached state |
-| `board` | `board` (bits 7..0 LEDs, bit 16 user button), `ports` (2 words: pins 0–15 and 16–31; bits 15..0 levels, 31..16 driven), `pwm` (bits 3..0 enabled, 6 bits per channel's pin), `adc` (9 codes, channels 0..8), `temp` (TSD code), `accel` (x y z in mg, hex) |
+| `board` | `board` (bits 7..0 LEDs, bit 16 user button), `ports` (2 words: pins 0–15 and 16–31; bits 15..0 levels, 31..16 driven), `pwm` (bits 3..0 enabled, 6 bits per channel's pin), `adc` (9 codes, channels 0..8), `temp` (TSD code), `accel` (x y z in mg, hex), `dds` (control, tuning; its pin also counts as driven) |
 | `store <len> <crc> on\|off` | erases the header, then 4 KB sectors as the payload arrives; refuses `args`, `timeout`, `crc`, `flash` |
 | `restart [skip]` | answers, waits for TX idle, sets `skip1` and resets the CPU via 0x8008. The app sends Ctrl-R (+ESC) instead, which also works during a tight loop |
 
@@ -326,11 +348,13 @@ the RX count and the CPU reset.
 | Test | Checks |
 |---|---|
 | `sim/run_flash_tests.ps1` | 23: flash ID, store, autostart, skips (button, ESC), listing, errors in the source, a source without final CR, flash and accelerometer words inside a saved source, 41 KB sources, erase |
-| `python sim/test_protocol.py` | 39: every request, answers during `ms`, SOH doubling, dropped requests, store/restart cycles, the `board` lines, data RAM limits, `buffer:` alignment, no answer while the flash is selected |
+| `python sim/test_protocol.py` | 41: every request, answers during `ms`, SOH doubling, dropped requests, store/restart cycles, the `board` lines (incl. the DDS), DDS tuning words, data RAM limits, `buffer:` alignment, no answer while the flash is selected |
 
 ## Timing and resources
 
-48 MHz CPU clock; slack about 2 ns at the slow corner (1200 mV, 85 °C). The design uses about
-4.1k of 8,064 logic elements, 272 kbit of the 378 kbit M9K RAM (24 KB RAM, 8 KB RX FIFO,
-1 KB TX FIFO, the stacks) and 18 of 48 9-bit multiplier elements (CPU and PWM). Quartus
+48 MHz CPU clock with about 1.5 ns of slack at the slow corner (1200 mV, 85 °C); the DDS
+clock, 192 MHz, about 1.2 ns. The design uses about 4.3k of 8,064 logic elements, 272 kbit
+of the 378 kbit M9K RAM (36 of 42 blocks: 24 KB RAM, 8 KB RX FIFO, 1 KB TX FIFO, the stacks,
+the ADC core's averaging buffer), 18 of 48 9-bit multiplier elements (CPU and PWM), and three
+of the PLL's five outputs. Quartus
 warns (16248) that the LED and UART pins sit next to ADC pins; they are fixed by the board.

@@ -470,6 +470,8 @@ class Machine:
         self.wel = False
         self.fl = {'n': 0, 'cmd': 0, 'addr': 0}
         self.crc = 0
+        # DDS: [tuning (32 bits), low half as written, control]; no time base in the ISS
+        self.dds = [0, 0, 0]
         # PWM channel c: [period low as written, period (32 bits), duty, control]
         self.pwm = [[0, 0, 0, 0] for _ in range(4)]
 
@@ -477,6 +479,8 @@ class Machine:
         """Pins owned by an enabled PWM channel, and their level: the ISS has no time
         base for the waveform, so a pin reads high only at full duty (0xFFFF)."""
         owns = level = 0
+        if self.dds[2] & 0x8000:
+            owns |= 1 << (self.dds[2] & 0x3F)
         for _, _, duty, control in self.pwm:
             if control & 0x8000:
                 bit = 1 << (control & 0x3F)
@@ -557,8 +561,10 @@ class Machine:
         return self.mem[a] | (self.mem[a + 1] << 8)
 
     def io_read(self, a):
-        if a & 0xC0 == 0x40:
-            return self.adc[(a >> 1) & 31]
+        if a & 0xE0 == 0x40:
+            return self.adc[(a >> 1) & 15]
+        if a & 0xE0 == 0x60:
+            return [self.dds[0] & 0xFFFF, self.dds[0] >> 16, self.dds[2], 0][(a >> 1) & 3]
         if a & 0xE0 == 0x80:
             _, period, duty, control = self.pwm[(a >> 3) & 3]
             return [period & 0xFFFF, period >> 16, duty, control][(a >> 1) & 3]
@@ -591,6 +597,15 @@ class Machine:
         return 0
 
     def store(self, a, v, byte):
+        if a & 0x8000 and a & 0xE0 == 0x60:
+            sel, v = (a >> 1) & 3, v & 0xFFFF
+            if sel == 0:
+                self.dds[1] = v
+            elif sel == 1:
+                self.dds[0] = (v << 16) | self.dds[1]
+            elif sel == 2:
+                self.dds[2] = v
+            return
         if a & 0x8000:
             if a & 0xE0 == 0x80:
                 ch, sel, v = self.pwm[(a >> 3) & 3], (a >> 1) & 3, v & 0xFFFF
@@ -728,6 +743,7 @@ class Machine:
         self.pc = self.t = self.dsp = self.rsp = 0
         self.leds = self.pin_out = self.pin_dir = 0
         self.pwm = [[0, 0, 0, 0] for _ in range(4)]
+        self.dds = [0, 0, 0]
         self.spi_select(False)
         self.restart_pending = False
         self.starts += 1

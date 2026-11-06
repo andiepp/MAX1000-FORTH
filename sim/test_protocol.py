@@ -157,6 +157,18 @@ bd = lines(pl)
 check('board pins/pwm/leds', bd['board'] == ['000000A5'] and bd['ports'][0] == '00280048'
       and bd['pwm'] == ['00000051'], pl)
 
+# DDS: tuning words as Python computes them; its pin shows as driven; off again
+term = b.type('1000 dds-khz 9 dds-pin')
+head, pl = one(b.request('board')[1])
+bd = lines(pl)
+check('board: DDS on pin 9 at 1 MHz', bd.get('dds') == ['8009', f'{(10**6 * 2**32 + 96 * 10**6) // (192 * 10**6):08X}']
+      and int(bd['ports'][0], 16) >> 16 & 0x0200, pl)
+term = b.type('dds-off 1 dds-hz $8060 @ . 65535 dds-khz $8062 @ . $8060 @ .')
+t1, t2 = (2**32 + 96 * 10**6) // (192 * 10**6), (65535000 * 2**32 + 96 * 10**6) // (192 * 10**6)
+lo = t2 & 0xFFFF
+lo = lo - 0x10000 if lo & 0x8000 else lo          # `.` prints cells signed
+check('DDS tuning at 1 Hz and 65535 kHz', f'{t1} {t2 >> 16} {lo}' in term, (term, t1, t2))
+
 text = b': hi 42 ;\r'
 crc = zlib.crc32(text)
 head, pl = one(b.request(f'store {len(text)} {crc:08X} on', text)[1])

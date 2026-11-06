@@ -207,6 +207,29 @@ variable dp2             \ next free byte of the data RAM (COLD resets it)
 : pwm-off ( ch -- ) pwm 6 + 0 swap ! ;
 
 \ ---------------------------------------------------------------------------
+\ DDS: a square wave on any pin from a 32-bit phase accumulator on its own
+\ 192 MHz clock (rtl/dds.v): f = tuning * 192 MHz / 2^32, steps of 0.045 Hz,
+\ edges on a 5.2 ns grid. $8060/$8062 tuning (the low half is held until the
+\ high half is written), $8064 control (bit 15 on, bits 5..0 pin; read: bit 14
+\ = a change not yet taken over). Like a PWM channel it owns its pin while on.
+\ ---------------------------------------------------------------------------
+
+: dds-sync ( -- ) begin $8064 @ $4000 and 0= until ;
+: dds-tuning ( ud -- ) swap $8060 ! $8062 ! dds-sync ;
+46875 constant dds-d                  \ tuning = hz * 2^20 / 46875 at 192 MHz
+\ (hz*2^20 + 46875/2) / 46875 by long division, 16 bits at a time
+: (dds-hz) ( ud -- )
+  over 12 rshift over 4 lshift or >r 12 rshift >r 4 lshift
+  r> 0 dds-d um/mod drop
+  r> swap dds-d um/mod drop
+  dds-d um/mod
+  swap 23437 swap dds-d um/mod nip swap dds-tuning ;
+: dds-hz ( u -- ) 0 (dds-hz) ;        \ 0..65535 Hz
+: dds-khz ( u -- ) 1000 um* (dds-hz) ; \ 0..65535 kHz
+: dds-pin ( pin -- ) dup pin 2drop $8000 or $8064 ! dds-sync ;
+: dds-off ( -- ) 0 $8064 ! dds-sync ;
+
+\ ---------------------------------------------------------------------------
 \ Analog inputs: ADC1 of the MAX 10, 12 bits, 0..3.3 V (internal reference =
 \ VCCA), all channels converted continuously (rtl/adc_scan.v). ADC channel c
 \ (0..8) reads at $8040+2c. Inputs by header label: 0..7 = AIN0..AIN7,
@@ -459,7 +482,12 @@ variable pp
       $3F and dup 4 rshift pp @ = if 15 and 1 swap lshift or else drop then
     then
   loop ;
-: port-word ( p -- lo hi ) dup 3 lshift $8010 + dup @ swap 4 + @ rot pwm-own or ;
+\ the DDS's pin, if it is on and in port p
+: dds-own ( p -- mask )
+  $8064 @ dup $8000 and 0= if 2drop 0 exit then
+  $3F and dup 4 rshift rot = if 15 and 1 swap lshift else drop 0 then ;
+: port-word ( p -- lo hi )
+  dup 3 lshift $8010 + dup @ swap 4 + @ rot dup pwm-own swap dds-own or or ;
 : pwm-word ( -- lo hi )
   0 4 0 do i pwm-ctl $8000 and if 1 i lshift or then loop
   0 pwm-ctl $3F and 4 lshift or 1 pwm-ctl $3F and 10 lshift or
@@ -470,7 +498,8 @@ variable pp
   ." pwm " pwm-word hex8 lf
   ." adc" 9 0 do space i adc-ch@ hex4 loop lf
   ." temp " temp-code@ hex4 lf
-  ." accel " accel@ rot hex4 space swap hex4 space hex4 lf ;
+  ." accel " accel@ rot hex4 space swap hex4 space hex4 lf
+  ." dds " $8064 @ hex4 space $8060 @ $8062 @ hex8 lf ;
 : p-source ( -- )
   s-len @ 0 1 f-read begin dup while 0 spi emit 1- repeat drop f-end ;
 : tx-idle ( -- ) begin $8002 @ 4 and until ;

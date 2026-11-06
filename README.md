@@ -13,7 +13,7 @@ straight to the board's USB serial port.
 - A **Forth kernel** of about 300 words, written in Forth and cross-compiled on the PC: the
   interpreter and compiler, 32-bit mixed arithmetic, and the board's I/O.
 - **Board I/O:** 8 user LEDs and the user button; 23 digital pins (D0..D14 and the Pmod's
-  PIO1..PIO8) with four PWM channels on any pin; 9 analog inputs (12 bits, 0..3.3 V); the
+  PIO1..PIO8) with four PWM channels and a 192 MHz DDS square-wave generator on any pin; 9 analog inputs (12 bits, 0..3.3 V); the
   MAX 10's temperature sensor; the on-board LIS3DH accelerometer.
 - **Saved source:** one Forth source in the board's 8 MB serial flash runs at every start;
   hold the user button (or send ESC) to skip it.
@@ -61,6 +61,7 @@ the service protocol.
 | LEDs, button, time | `led!` `led@` `btn@` `ms@` `ms` |
 | Digital pins (0..14 = D0..D14, 16..23 = PIO1..PIO8) | `output` `input` `high` `low` `toggle` `pin!` `pin@` |
 | PWM | `pwm-hz` `pwm-khz` `pwm-duty` `pwm-pin` `pwm-off` |
+| DDS square wave (0.045 Hz steps) | `dds-hz` `dds-khz` `dds-tuning` `dds-pin` `dds-off` |
 | Analog (0..7 = AIN0..AIN7, 8 = AIN) | `adc@` `mv@` `adc-ch@` |
 | Temperature, accelerometer | `temp@` `.temp` `temp-code@` `accel@` `accel?` `acc@` `acc!` |
 | Data RAM | `buffer:` `unused` `unused-data` |
@@ -91,8 +92,8 @@ scripts\Build-Release.ps1 -Version 1.0                      # release zip in dis
 ```
 
 `build.ps1` finds Quartus via `-Quartus`, `QUARTUS_ROOTDIR` or `<drive>:\Quartus\18.1\quartus`.
-The design uses about 4.1k of 8,064 logic elements, 70% of the M9K RAM and 18 multiplier
-elements, with about 2 ns of slack at 48 MHz.
+The design uses about 4.3k of 8,064 logic elements, 70% of the M9K RAM and 18 multiplier
+elements, with about 1.5 ns of slack at 48 MHz (CPU) and 1.2 ns at 192 MHz (DDS).
 
 ## Repository
 
