@@ -5,7 +5,7 @@ Intel MAX 10 10M08SAU169C8G). Its CPU, the **HF16**, is the 16-bit stack machine
 [ZYNQ-FORTH](https://github.com/andiepp/ZYNQ-FORTH), built in the FPGA. Every HF16
 instruction is a Forth primitive. There is no soft processor and no second processor:
 the Forth kernel is part of the FPGA configuration, and Forth talks directly over the
-board's USB serial port, where the **ZYNQ-FORTH app** or any terminal program talks to it.
+board's USB serial port, where the **Windows app** or any terminal program talks to it.
 
 Besides the board's 8 LEDs and its user button, Forth reaches the 23 digital pins of the
 Arduino-style header and the Pmod header, with four PWM channels, a DDS square-wave
@@ -25,7 +25,7 @@ Contents:
   - [1.2 Put MAX1000-FORTH on the board](#12-put-max1000-forth-on-the-board)
   - [1.3 Connect](#13-connect)
   - [1.4 First session](#14-first-session)
-- **[2. The ZYNQ-FORTH app](#2-the-zynq-forth-app)**
+- **[2. The Windows app](#2-the-windows-app)**
   - [2.1 Connecting](#21-connecting)
   - [2.2 The layout](#22-the-layout)
   - [2.3 How the app talks to the MAX1000](#23-how-the-app-talks-to-the-max1000)
@@ -95,14 +95,15 @@ Contents:
 
 ### 1.1 What you need
 
-- A Trenz **MAX1000** with the **10M08SAU169C8G** (TEI0001-02) and a micro-USB cable.
-  MAX1000-FORTH is built for this device; a board with another MAX 10 needs its own build
-  (chapter 8).
-- To write MAX1000-FORTH into the FPGA, once: the **Arrow USB Blaster** driver (the
-  MAX1000's on-board programmer) and the Intel **Quartus Prime Programmer**, either the
-  standalone Programmer or the one that comes with Quartus Prime.
-- To work with it: on Windows the **ZYNQ-FORTH app**, release 2.4 or later. Any system can
-  use a terminal program instead.
+- A Trenz **MAX1000** (TEI0001-02, with the MAX 10 10M08SAU169C8G) and a micro-USB cable.
+  MAX1000-FORTH supports this board only.
+- **No programmer hardware:** the MAX1000 has its programmer on board (an Arrow USB Blaster
+  in its USB chip), so the one USB cable writes the FPGA and carries Forth's serial port.
+- On the PC, to write MAX1000-FORTH into the board once: the **Arrow USB Blaster** driver
+  for that built-in programmer and Intel's **Quartus Prime Programmer** software, either
+  the standalone Programmer or the one that comes with Quartus Prime.
+- To work with it: on Windows the **Windows app** (chapter 2). Any system can use a terminal
+  program instead.
 - Optionally Python 3 with pyserial (`pip install pyserial`) for `tools/mforth.py`, which
   sends files and saves a source in the board's flash from the command line.
 
@@ -111,7 +112,7 @@ Contents:
 Paths in this manual are relative to the **MAX1000-FORTH folder**: the folder of an unpacked
 release, or the repository. Commands run in that folder.
 
-1. Download `MAX1000-FORTH-1.0.zip` from
+1. Download `MAX1000-FORTH-1.3.zip` (or a later release) from
    [the releases](https://github.com/andiepp/MAX1000-FORTH/releases) and unpack it. It
    holds:
 
@@ -122,10 +123,11 @@ release, or the repository. Commands run in that folder.
    | `firmware\program_flash.ps1` | writes one of the two to the board |
    | `tools\mforth.py` | sends lines and files, saves a source in the flash |
    | `examples\` | Forth examples (`bench.fs`, section 6.8) |
-   | `docs\` | this manual (`Manual.pdf`) and `design.md` |
+   | `docs\` | this manual (`Manual.pdf`) and the implementation details (`Implementation-Details.pdf`, `design.md`) |
    | `README.md`, `LICENSE`, `CHANGELOG.md` | |
 
-2. Install the Arrow USB Blaster driver and the Quartus Prime Programmer.
+2. Install the Arrow USB Blaster driver (for the board's built-in programmer) and the
+   Quartus Prime Programmer software.
 3. Plug the board in and run the script in PowerShell:
    ```powershell
    .\firmware\program_flash.ps1
@@ -192,14 +194,14 @@ read it. The **USER** button beside it belongs to Forth (`btn@`, section 5.10).
 
 ---
 
-## 2. The ZYNQ-FORTH app
+## 2. The Windows app
 
-The app of the sister project [ZYNQ-FORTH](https://github.com/andiepp/ZYNQ-FORTH) works with
-MAX1000-FORTH since its release 2.4. Download `ZYNQ-FORTH-2.4-windows-x64.zip` (or a later
-release) from [its releases](https://github.com/andiepp/ZYNQ-FORTH/releases), unpack it and
-start **ZynqForth.exe**. The app recognises the MAX1000 by its answer to the `version`
-request and adapts itself. Its **Manual** button (F1) opens the ZYNQ-FORTH manual, which
-describes the app in full; this chapter covers what you need with a MAX1000.
+The Windows app is published together with the HF16's first home, so it is downloaded from
+there: `ZYNQ-FORTH-<version>-windows-x64.zip`, release 2.4.4 or later, from
+[the app's releases](https://github.com/andiepp/ZYNQ-FORTH/releases). Unpack it and start
+**ZynqForth.exe**. The app recognises the MAX1000 by its answer to the `version` request and
+adapts itself; its **Manual** button (F1) then opens this manual. This chapter covers what
+you need with a MAX1000.
 
 The app is a small development environment for the HF16 on Windows:
 
@@ -210,7 +212,7 @@ The app is a small development environment for the HF16 on Windows:
 - the **board view**: LEDs, user button, digital pins, PWM channels and analog inputs, live;
 - five **skins**.
 
-![The ZYNQ-FORTH app with the MAX1000 running examples/bench.fs](images/app-max1000.png)
+![The Windows app with the MAX1000 running examples/bench.fs](images/app-max1000.png)
 
 *The IDE dark skin after **Run all** of `examples/bench.fs` and `bench` (section 6.8): the
 potentiometer on AIN3 stands at about 2.5 V, so LED1 to LED6 are lit and PWM channel 0
@@ -532,7 +534,7 @@ has loaded its configuration. The serial port is connected straight to the CPU's
 | Line sender, source storing | `tools/mforth.py` |
 | Build scripts | `scripts/build.ps1`, `scripts/build.tcl` |
 
-The app belongs to the ZYNQ-FORTH project.
+The Windows app is described in chapter 2.
 
 ### 4.2 The HF16 CPU
 
@@ -2112,7 +2114,7 @@ number.
 | Symptom | Cause and remedy |
 |---|---|
 | No banner, nothing happens | The banner came before you connected: press Ctrl-R (or *Restart* in the app). Check the port (channel B of the board's USB chip) and 115200 baud. If LED1 is dark, MAX1000-FORTH is not running: program it (chapter 1) and press RESET. |
-| `program_flash.ps1` finds no cable or no `quartus_pgm` | Install the Arrow USB Blaster driver and the Quartus Prime Programmer, and plug the board in. `quartus_pgm -l` lists the cables Quartus sees. |
+| `program_flash.ps1` finds no board or no `quartus_pgm` | Install the Arrow USB Blaster driver (the board's built-in programmer) and the Quartus Prime Programmer software, and plug the board in with its USB cable. `quartus_pgm -l` lists what Quartus sees: the board appears as an Arrow USB Blaster. |
 | The app says the board does not answer | Another program has the port, the wrong port is chosen, or the board runs another configuration. |
 | The app's status line shows *no answer* while a word runs | The word only computes: Forth answers the app only at the prompt and in `ms`, `key?`, `key` and output (section 2.3). Wait, or click *Restart*. |
 | The board hangs at power-up, or misbehaves from the start | The saved source does it: hold the USER button while you press RESET, or *Restart clean* in the app (section 4.7). Then switch the autostart off or erase it. |

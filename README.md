@@ -6,7 +6,7 @@ Intel MAX 10 10M08SAU169C8G). The CPU is **HF16**, the Forth processor of
 processor and no loader: the Forth kernel is part of the FPGA configuration, and Forth talks
 straight to the board's USB serial port.
 
-![The ZYNQ-FORTH app with the MAX1000 running examples/bench.fs](docs/images/app-max1000.png)
+![The Windows app with the MAX1000 running examples/bench.fs](docs/images/app-max1000.png)
 
 - **HF16** at 48 MHz, one Forth primitive per clock, with 24 KB of RAM: 16 KB for code and
   the dictionary, 8 KB data RAM.
@@ -19,7 +19,7 @@ straight to the board's USB serial port.
 - **Saved source:** one Forth source in the board's 8 MB serial flash runs at every start;
   hold the user button (or send ESC) to skip it.
 - **Any terminal** (PuTTY, Tera Term) talks to Forth at 115200 baud. The
-  [ZYNQ-FORTH app](https://github.com/andiepp/ZYNQ-FORTH/releases) (2.4 and later) adds an
+  [Windows app](https://github.com/andiepp/ZYNQ-FORTH/releases) (2.4.4 and later) adds an
   editor, the data stack, the dictionary, the saved source and a live view of the board: the
   kernel answers its service requests itself.
 
@@ -27,8 +27,9 @@ straight to the board's USB serial port.
 
 1. Download `MAX1000-FORTH-<version>.zip` from the
    [releases](https://github.com/andiepp/MAX1000-FORTH/releases) and unpack it.
-2. Install the **Arrow USB Blaster** driver and the **Quartus Prime Programmer** (or Quartus
-   Prime Lite, which contains it).
+2. Install the **Arrow USB Blaster** driver (the MAX1000 has its programmer on board, so no
+   other hardware is needed) and the **Quartus Prime Programmer** (or Quartus Prime Lite,
+   which contains it).
 3. Plug in the MAX1000 and write MAX1000-FORTH into its flash:
 
    ```powershell
