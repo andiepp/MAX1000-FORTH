@@ -667,6 +667,9 @@ public sealed class MainViewModel : ObservableObject
     /// Decompiles a word: reads the dictionary again (addresses change as words are added),
     /// then the word's code with the <c>mem</c> request (firmware 1.4 and later).
     /// </summary>
+    /// <summary>A message in the status line, from the window (help, See).</summary>
+    public void ShowMessage(string text, bool error = false) => SetStatus(text, error);
+
     public async Task<Decompiled?> SeeAsync(ForthWord word)
     {
         Decompiled? result = null;

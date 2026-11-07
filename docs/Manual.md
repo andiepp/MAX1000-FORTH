@@ -14,7 +14,7 @@ the temperature diode of the MAX 10's built-in converter, the board's LIS3DH
 at every start.
 
 This manual covers how to use the system, how the implementation works, and every word in
-the kernel. It describes MAX1000-FORTH 1.4. For the hardware details (I/O map, pins, ADC
+the kernel. It describes MAX1000-FORTH 1.4.1. For the hardware details (I/O map, pins, ADC
 channels, service requests), see [design.md](design.md).
 
 Contents:
@@ -32,9 +32,10 @@ Contents:
   - [2.5 The editor](#25-the-editor)
   - [2.6 The data stack and the dictionary](#26-the-data-stack-and-the-dictionary)
   - [2.7 See: a word as Forth source](#27-see-a-word-as-forth-source)
-  - [2.8 The saved source](#28-the-saved-source)
-  - [2.9 The board view](#29-the-board-view)
-  - [2.10 A worked session](#210-a-worked-session)
+  - [2.8 Help: every word, searchable](#28-help-every-word-searchable)
+  - [2.9 The saved source](#29-the-saved-source)
+  - [2.10 The board view](#210-the-board-view)
+  - [2.11 A worked session](#211-a-worked-session)
 - **[3. Working with the interpreter](#3-working-with-the-interpreter)**
   - [3.1 Input line](#31-input-line)
   - [3.2 Words and numbers](#32-words-and-numbers)
@@ -142,7 +143,7 @@ release, or the repository. Commands run in that folder.
 
 The internal flash keeps MAX1000-FORTH until something else is written there; it replaces
 the configuration the board had before (for example the factory demo). The 8 MB serial
-flash is a separate chip, and the Forth source you save there (section 2.8) is not touched
+flash is a separate chip, and the Forth source you save there (section 2.9) is not touched
 by programming the FPGA.
 
 To try MAX1000-FORTH without replacing the board's configuration,
@@ -403,7 +404,34 @@ $32CA  700C  exit              \ ;
 - An instruction pattern that no Forth word produces is shown in brackets, for example
   `[jump $1234]`.
 
-### 2.8 The saved source
+### 2.8 Help: every word, searchable
+
+**Help** (beside **Manual**, or **F2**) opens a window with help on every Forth word of the
+kernel. It stays open beside the app while you edit and type, and needs no board.
+
+![The Help window on uart-open](images/app-help.png)
+
+- **Find** searches the words' names, stack effects and descriptions. Several terms must all
+  appear: `uart baud` finds `uart-open`, `negative` the words whose description mentions
+  negative numbers. Names come first (the exact name, then names that start with the term),
+  then matches in stack effects and descriptions; the kernel's internal words come after the
+  ones meant for use. **Up**/**Down** move through the list.
+- The list beside **Find** limits the words to one section of chapter 5 (Data stack,
+  Arithmetic, Digital pins, PWM, Serial interfaces, …).
+- The right side shows the selected word: its stack effect, the manual section it comes from,
+  the description, **related** words (the same table of the manual, click to go there) and
+  **examples** from the manual's code.
+- **F2** in the editor or the terminal's input line opens the help on the word at the cursor.
+  A word you defined yourself has no help; the status line then points to **See**
+  (section 2.7).
+- **Insert** (or Enter, or a double-click) adds the word to the terminal's input line;
+  **Copy** puts the word and its help on the clipboard. **Keep on top** keeps the window above
+  other programs too. The window remembers its place and size.
+
+The help is taken from this manual's word reference (chapter 5) when the app is built
+(`tools/make_word_help.py`), so it says what the manual says.
+
+### 2.9 The saved source
 
 The serial flash keeps one Forth source. With **autostart** on, Forth reads it after the
 kernel starts, at power-up, after RESET and after every restart, as if it were typed
@@ -427,7 +455,7 @@ until a key is pressed (section 6.9); one that loops for ever, or waits for `key
 Forth at every start. To get past it, **hold the USER button** while you press RESET or
 restart, or click **Restart clean**; then switch the autostart off or erase the source.
 
-### 2.9 The board view
+### 2.10 The board view
 
 Tick **Board** at the top right (the Lab panel skin ticks it for you). The view shows the
 board as Forth sees it, read several times a second:
@@ -449,7 +477,7 @@ board as Forth sees it, read several times a second:
 The view only reads: Forth's I/O is never changed by it. It is updated only while Forth
 answers (section 2.3).
 
-### 2.10 A worked session
+### 2.11 A worked session
 
 This session writes a small program, tries it, and makes it start with the board. The
 program is a running light on LED1 to LED8:
@@ -769,7 +797,7 @@ dictionary is reset and the saved source runs again, but the pins keep their sta
 
 ### 4.7 The saved source (autostart)
 
-One Forth source can be kept in the serial flash (from the app, section 2.8, or with
+One Forth source can be kept in the serial flash (from the app, section 2.9, or with
 `python tools/mforth.py -p COMx --store file.fs`). Its format:
 
 | Flash address | Content |
@@ -1475,7 +1503,7 @@ behind the request waits as well, so end the read before you read the keyboard.
 ### 5.18 Saved source
 
 These words work on the source kept in the flash (section 4.7). The app does the same with
-its saved-source box (section 2.8).
+its saved-source box (section 2.9).
 
 | Word | Stack | Description |
 |---|---|---|
@@ -2201,7 +2229,7 @@ number.
 | The board hangs at power-up, or misbehaves from the start | The saved source does it: hold the USER button while you press RESET, or *Restart clean* in the app (section 4.7). Then switch the autostart off or erase it. |
 | An error ends in `(in the saved source)` | A line of the saved source failed; the lines after it were not run. Fix the source and store it again. |
 | Forth stops responding | A word is in an endless loop or waiting for `key`. Press any key, or Ctrl-R (*Restart* in the app). |
-| Your words are gone | A restart or a power cycle brings back the original kernel. Keep useful definitions in a file and run it, save it as the board's source (section 2.8), or add them to `kernel.fs`. |
+| Your words are gone | A restart or a power cycle brings back the original kernel. Keep useful definitions in a file and run it, save it as the board's source (section 2.9), or add them to `kernel.fs`. |
 | Pasting a long text into a terminal program loses characters | Forth's receive buffer holds 8 KB. Paste in parts, or use the app's *Run all* or `mforth.py -f`, which wait for Forth. |
 | Numbers look wrong, or every number gives `?` | Check `base`: after `hex` or `2 base !`, input and output both use that base, and an error doesn't reset it. `decimal` switches back. |
 | A long line gives an error near its end | Only 80 characters fit on a line; the rest is dropped, possibly in the middle of a word. Split the line. |

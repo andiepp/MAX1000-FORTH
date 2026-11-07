@@ -1,0 +1,6367 @@
+[
+{
+"name": "dup",
+"stack": "( x -- x x )",
+"text": "Copy the top item.",
+"section": "5.1 Data stack",
+"area": "Data stack",
+"related": [
+"drop",
+"swap",
+"over",
+"nip",
+"tuck",
+"rot",
+"-rot",
+"2dup",
+"2drop",
+"?dup",
+"depth",
+".s"
+],
+"examples": [
+": sq dup * ;",
+": fact ( n -- n! ) dup 1 > if dup 1- recurse * then ;",
+"epin @ pin@ dup elast @ <> if 1 ecount +! then elast !"
+]
+},
+{
+"name": "drop",
+"stack": "( x -- )",
+"text": "Remove the top item.",
+"section": "5.1 Data stack",
+"area": "Data stack",
+"related": [
+"dup",
+"swap",
+"over",
+"nip",
+"tuck",
+"rot",
+"-rot",
+"2dup",
+"2drop",
+"?dup",
+"depth",
+".s"
+],
+"examples": [
+"10 low $9F 0 spi-xfer drop 0 0 spi-xfer . 10 high",
+"$48 0 i2c-addr drop 0 i2c-write drop",
+"$48 1 i2c-addr drop -1 i2c-read 8 lshift 0 i2c-read or i2c-stop ;"
+]
+},
+{
+"name": "swap",
+"stack": "( x1 x2 -- x2 x1 )",
+"text": "Exchange the top two items.",
+"section": "5.1 Data stack",
+"area": "Data stack",
+"related": [
+"dup",
+"drop",
+"over",
+"nip",
+"tuck",
+"rot",
+"-rot",
+"2dup",
+"2drop",
+"?dup",
+"depth",
+".s"
+],
+"examples": [
+"accel@ rot . swap . . 0 0 1000  ok   \\ x y z, the board lying flat",
+"wait-btn ms@ swap - 0 led!",
+": level ( -- n ) 3 adc@ 9 4096 */ 1 swap lshift 1- ;"
+]
+},
+{
+"name": "over",
+"stack": "( x1 x2 -- x1 x2 x1 )",
+"text": "Copy the second item to the top.",
+"section": "5.1 Data stack",
+"area": "Data stack",
+"related": [
+"dup",
+"drop",
+"swap",
+"nip",
+"tuck",
+"rot",
+"-rot",
+"2dup",
+"2drop",
+"?dup",
+"depth",
+".s"
+],
+"examples": [
+"ms@ over - 499 > if 5 toggle show drop ms@ then"
+]
+},
+{
+"name": "nip",
+"stack": "( x1 x2 -- x2 )",
+"text": "Remove the second item.",
+"section": "5.1 Data stack",
+"area": "Data stack",
+"related": [
+"dup",
+"drop",
+"swap",
+"over",
+"tuck",
+"rot",
+"-rot",
+"2dup",
+"2drop",
+"?dup",
+"depth",
+".s"
+],
+"examples": [
+": up? accel@ nip nip 0> if .\" face up\" else .\" face down\" then cr ;"
+]
+},
+{
+"name": "tuck",
+"stack": "( a b -- b a b )",
+"text": "Copy the top item below the second.",
+"section": "5.1 Data stack",
+"area": "Data stack",
+"related": [
+"dup",
+"drop",
+"swap",
+"over",
+"nip",
+"rot",
+"-rot",
+"2dup",
+"2drop",
+"?dup",
+"depth",
+".s"
+],
+"examples": [
+": span ( -- min max ) 32767 -32768 64 0 do i sample @ tuck max >r min r> loop ;"
+]
+},
+{
+"name": "rot",
+"stack": "( a b c -- b c a )",
+"text": "Rotate the third item to the top.",
+"section": "5.1 Data stack",
+"area": "Data stack",
+"related": [
+"dup",
+"drop",
+"swap",
+"over",
+"nip",
+"tuck",
+"-rot",
+"2dup",
+"2drop",
+"?dup",
+"depth",
+".s"
+],
+"examples": [
+"1 2 3 rot .s <3> 2 3 1  ok",
+"accel@ rot . swap . . 0 0 1000  ok   \\ x y z, the board lying flat",
+": tilt begin accel@ rot . swap . . cr 500 ms key? until key drop ;"
+]
+},
+{
+"name": "-rot",
+"stack": "( a b c -- c a b )",
+"text": "Rotate the top item to third place.",
+"section": "5.1 Data stack",
+"area": "Data stack",
+"related": [
+"dup",
+"drop",
+"swap",
+"over",
+"nip",
+"tuck",
+"rot",
+"2dup",
+"2drop",
+"?dup",
+"depth",
+".s"
+],
+"examples": []
+},
+{
+"name": "2dup",
+"stack": "( a b -- a b a b )",
+"text": "Copy the top two items.",
+"section": "5.1 Data stack",
+"area": "Data stack",
+"related": [
+"dup",
+"drop",
+"swap",
+"over",
+"nip",
+"tuck",
+"rot",
+"-rot",
+"2drop",
+"?dup",
+"depth",
+".s"
+],
+"examples": []
+},
+{
+"name": "2drop",
+"stack": "( a b -- )",
+"text": "Remove the top two items.",
+"section": "5.1 Data stack",
+"area": "Data stack",
+"related": [
+"dup",
+"drop",
+"swap",
+"over",
+"nip",
+"tuck",
+"rot",
+"-rot",
+"2dup",
+"?dup",
+"depth",
+".s"
+],
+"examples": [
+": x-led ( -- n ) accel@ 2drop 1000 + 250 / 0 max 7 min ;"
+]
+},
+{
+"name": "?dup",
+"stack": "( x -- x x | 0 )",
+"text": "Copy the top item only if it is not zero.",
+"section": "5.1 Data stack",
+"area": "Data stack",
+"related": [
+"dup",
+"drop",
+"swap",
+"over",
+"nip",
+"tuck",
+"rot",
+"-rot",
+"2dup",
+"2drop",
+"depth",
+".s"
+],
+"examples": []
+},
+{
+"name": "depth",
+"stack": "( -- n )",
+"text": "Number of items on the data stack, before depth itself pushes.",
+"section": "5.1 Data stack",
+"area": "Data stack",
+"related": [
+"dup",
+"drop",
+"swap",
+"over",
+"nip",
+"tuck",
+"rot",
+"-rot",
+"2dup",
+"2drop",
+"?dup",
+".s"
+],
+"examples": []
+},
+{
+"name": ".s",
+"stack": "( -- )",
+"text": "Show the stack without changing it: <3> 1 2 3, with the depth and the top on the right.",
+"section": "5.1 Data stack",
+"area": "Data stack",
+"related": [
+"dup",
+"drop",
+"swap",
+"over",
+"nip",
+"tuck",
+"rot",
+"-rot",
+"2dup",
+"2drop",
+"?dup",
+"depth"
+],
+"examples": [
+"1 2 3 rot .s <3> 2 3 1  ok"
+]
+},
+{
+"name": ">r",
+"stack": "( x -- ) R: ( -- x )",
+"text": "Move the top item to the return stack.",
+"section": "5.2 Return stack",
+"area": "Return stack",
+"related": [
+"r>",
+"r@"
+],
+"examples": [
+": span ( -- min max ) 32767 -32768 64 0 do i sample @ tuck max >r min r> loop ;"
+]
+},
+{
+"name": "r>",
+"stack": "( -- x ) R: ( x -- )",
+"text": "Move the top of the return stack back.",
+"section": "5.2 Return stack",
+"area": "Return stack",
+"related": [
+">r",
+"r@"
+],
+"examples": [
+": span ( -- min max ) 32767 -32768 64 0 do i sample @ tuck max >r min r> loop ;"
+]
+},
+{
+"name": "r@",
+"stack": "( -- x ) R: ( x -- x )",
+"text": "Copy the top of the return stack.",
+"section": "5.2 Return stack",
+"area": "Return stack",
+"related": [
+">r",
+"r>"
+],
+"examples": []
+},
+{
+"name": "+",
+"stack": "( n1 n2 -- n3 )",
+"text": "Sum.",
+"section": "5.3 Arithmetic",
+"area": "Arithmetic",
+"related": [
+"-",
+"*",
+"/",
+"mod",
+"/mod",
+"u/mod",
+"*/",
+"um*",
+"um/mod",
+"1+",
+"1-",
+"2*"
+],
+"examples": [
+"table 2 cells + ? 4  ok",
+": five [ 2 3 + ] literal ;  ok",
+": x-led ( -- n ) accel@ 2drop 1000 + 250 / 0 max 7 min ;"
+]
+},
+{
+"name": "-",
+"stack": "( n1 n2 -- n3 )",
+"text": "Difference n1 − n2.",
+"section": "5.3 Arithmetic",
+"area": "Arithmetic",
+"related": [
+"+",
+"*",
+"/",
+"mod",
+"/mod",
+"u/mod",
+"*/",
+"um*",
+"um/mod",
+"1+",
+"1-",
+"2*"
+],
+"examples": [
+"wait-btn ms@ swap - 0 led!",
+": ramp-down 100 0 do 1000 i 10 * - 0 pwm-duty 10 ms loop ;",
+"dup ms@ - 0<"
+]
+},
+{
+"name": "*",
+"stack": "( n1 n2 -- n3 )",
+"text": "Product, low 16 bits; one instruction (hardware multiplier).",
+"section": "5.3 Arithmetic",
+"area": "Arithmetic",
+"related": [
+"+",
+"-",
+"/",
+"mod",
+"/mod",
+"u/mod",
+"*/",
+"um*",
+"um/mod",
+"1+",
+"1-",
+"2*"
+],
+"examples": [
+": sq dup * ;",
+": fact ( n -- n! ) dup 1 > if dup 1- recurse * then ;",
+": table 3 1 do 3 1 do j i * . loop loop ;"
+]
+},
+{
+"name": "/",
+"stack": "( n d -- quot )",
+"text": "Quotient, rounded toward zero: -7 2 / gives −3.",
+"section": "5.3 Arithmetic",
+"area": "Arithmetic",
+"related": [
+"+",
+"-",
+"*",
+"mod",
+"/mod",
+"u/mod",
+"*/",
+"um*",
+"um/mod",
+"1+",
+"1-",
+"2*"
+],
+"examples": [
+": x-led ( -- n ) accel@ 2drop 1000 + 250 / 0 max 7 min ;"
+]
+},
+{
+"name": "mod",
+"stack": "( n d -- rem )",
+"text": "Remainder, with the sign of n: -7 2 mod gives −1.",
+"section": "5.3 Arithmetic",
+"area": "Arithmetic",
+"related": [
+"+",
+"-",
+"*",
+"/",
+"/mod",
+"u/mod",
+"*/",
+"um*",
+"um/mod",
+"1+",
+"1-",
+"2*"
+],
+"examples": []
+},
+{
+"name": "/mod",
+"stack": "( n d -- rem quot )",
+"text": "Remainder and quotient (symmetric division).",
+"section": "5.3 Arithmetic",
+"area": "Arithmetic",
+"related": [
+"+",
+"-",
+"*",
+"/",
+"mod",
+"u/mod",
+"*/",
+"um*",
+"um/mod",
+"1+",
+"1-",
+"2*"
+],
+"examples": []
+},
+{
+"name": "u/mod",
+"stack": "( u d -- rem quot )",
+"text": "Unsigned division: -7 2 u/mod gives 1 32764.",
+"section": "5.3 Arithmetic",
+"area": "Arithmetic",
+"related": [
+"+",
+"-",
+"*",
+"/",
+"mod",
+"/mod",
+"*/",
+"um*",
+"um/mod",
+"1+",
+"1-",
+"2*"
+],
+"examples": []
+},
+{
+"name": "*/",
+"stack": "( n1 n2 n3 -- n4 )",
+"text": "n1 × n2 / n3 with a 32-bit intermediate product, so the product may exceed 16 bits: 3000 1000 4096 */ gives 732. Rounds toward zero.",
+"section": "5.3 Arithmetic",
+"area": "Arithmetic",
+"related": [
+"+",
+"-",
+"*",
+"/",
+"mod",
+"/mod",
+"u/mod",
+"um*",
+"um/mod",
+"1+",
+"1-",
+"2*"
+],
+"examples": [
+": level ( -- n ) 3 adc@ 9 4096 */ 1 swap lshift 1- ;",
+": bar ( mv -- ) 8 3300 */ 1 swap lshift 1- led! ;",
+"pot dup bar 1000 3300 */ 0 pwm-duty"
+]
+},
+{
+"name": "um*",
+"stack": "( u1 u2 -- ud )",
+"text": "Full 32-bit unsigned product as two cells, the high cell on top: -1 -1 um* gives 1 −2 (65534).",
+"section": "5.3 Arithmetic",
+"area": "Arithmetic",
+"related": [
+"+",
+"-",
+"*",
+"/",
+"mod",
+"/mod",
+"u/mod",
+"*/",
+"um/mod",
+"1+",
+"1-",
+"2*"
+],
+"examples": []
+},
+{
+"name": "um/mod",
+"stack": "( ud u -- rem quot )",
+"text": "Divide a 32-bit unsigned number by u. The quotient must fit in 16 bits (high cell < u).",
+"section": "5.3 Arithmetic",
+"area": "Arithmetic",
+"related": [
+"+",
+"-",
+"*",
+"/",
+"mod",
+"/mod",
+"u/mod",
+"*/",
+"um*",
+"1+",
+"1-",
+"2*"
+],
+"examples": []
+},
+{
+"name": "1+",
+"stack": "( n -- n+1 )",
+"text": "Add one.",
+"section": "5.3 Arithmetic",
+"area": "Arithmetic",
+"related": [
+"+",
+"-",
+"*",
+"/",
+"mod",
+"/mod",
+"u/mod",
+"*/",
+"um*",
+"um/mod",
+"1-",
+"2*"
+],
+"examples": [
+": sq sq 1+ ;   \\ the inner sq is the old one"
+]
+},
+{
+"name": "1-",
+"stack": "( n -- n-1 )",
+"text": "Subtract one.",
+"section": "5.3 Arithmetic",
+"area": "Arithmetic",
+"related": [
+"+",
+"-",
+"*",
+"/",
+"mod",
+"/mod",
+"u/mod",
+"*/",
+"um*",
+"um/mod",
+"1+",
+"2*"
+],
+"examples": [
+": fact ( n -- n! ) dup 1 > if dup 1- recurse * then ;",
+": level ( -- n ) 3 adc@ 9 4096 */ 1 swap lshift 1- ;",
+": bar ( mv -- ) 8 3300 */ 1 swap lshift 1- led! ;"
+]
+},
+{
+"name": "2*",
+"stack": "( n -- n*2 )",
+"text": "Double.",
+"section": "5.3 Arithmetic",
+"area": "Arithmetic",
+"related": [
+"+",
+"-",
+"*",
+"/",
+"mod",
+"/mod",
+"u/mod",
+"*/",
+"um*",
+"um/mod",
+"1+",
+"1-"
+],
+"examples": []
+},
+{
+"name": "2/",
+"stack": "( n -- n/2 )",
+"text": "Arithmetic shift right; keeps the sign (-8 2/ gives −4).",
+"section": "5.3 Arithmetic",
+"area": "Arithmetic",
+"related": [
+"+",
+"-",
+"*",
+"/",
+"mod",
+"/mod",
+"u/mod",
+"*/",
+"um*",
+"um/mod",
+"1+",
+"1-"
+],
+"examples": []
+},
+{
+"name": "negate",
+"stack": "( n -- -n )",
+"text": "Change the sign.",
+"section": "5.3 Arithmetic",
+"area": "Arithmetic",
+"related": [
+"+",
+"-",
+"*",
+"/",
+"mod",
+"/mod",
+"u/mod",
+"*/",
+"um*",
+"um/mod",
+"1+",
+"1-"
+],
+"examples": []
+},
+{
+"name": "abs",
+"stack": "( n -- u )",
+"text": "Absolute value. -32768 abs stays −32768 (as u: 32768).",
+"section": "5.3 Arithmetic",
+"area": "Arithmetic",
+"related": [
+"+",
+"-",
+"*",
+"/",
+"mod",
+"/mod",
+"u/mod",
+"*/",
+"um*",
+"um/mod",
+"1+",
+"1-"
+],
+"examples": []
+},
+{
+"name": "min",
+"stack": "( a b -- min )",
+"text": "Smaller of two signed numbers.",
+"section": "5.3 Arithmetic",
+"area": "Arithmetic",
+"related": [
+"+",
+"-",
+"*",
+"/",
+"mod",
+"/mod",
+"u/mod",
+"*/",
+"um*",
+"um/mod",
+"1+",
+"1-"
+],
+"examples": [
+": x-led ( -- n ) accel@ 2drop 1000 + 250 / 0 max 7 min ;",
+": span ( -- min max ) 32767 -32768 64 0 do i sample @ tuck max >r min r> loop ;"
+]
+},
+{
+"name": "max",
+"stack": "( a b -- max )",
+"text": "Larger of two signed numbers.",
+"section": "5.3 Arithmetic",
+"area": "Arithmetic",
+"related": [
+"+",
+"-",
+"*",
+"/",
+"mod",
+"/mod",
+"u/mod",
+"*/",
+"um*",
+"um/mod",
+"1+",
+"1-"
+],
+"examples": [
+": x-led ( -- n ) accel@ 2drop 1000 + 250 / 0 max 7 min ;",
+": span ( -- min max ) 32767 -32768 64 0 do i sample @ tuck max >r min r> loop ;"
+]
+},
+{
+"name": "umin",
+"stack": "( u1 u2 -- u )",
+"text": "Smaller of two unsigned numbers: -1 3 umin gives 3.",
+"section": "5.3 Arithmetic",
+"area": "Arithmetic",
+"related": [
+"+",
+"-",
+"*",
+"/",
+"mod",
+"/mod",
+"u/mod",
+"*/",
+"um*",
+"um/mod",
+"1+",
+"1-"
+],
+"examples": []
+},
+{
+"name": "and",
+"stack": "( x1 x2 -- x3 )",
+"text": "Bitwise AND.",
+"section": "5.4 Logic and shifts",
+"area": "Logic and shifts",
+"related": [
+"or",
+"xor",
+"invert",
+"lshift",
+"rshift"
+],
+"examples": [
+"$81 led!   \\ LED1 and LED8 on, all others off",
+"3 led-on   \\ LED3 on as well: LED1, LED3 and LED8 are lit",
+"1 led-off   \\ LED1 off: LED3 and LED8 stay on"
+]
+},
+{
+"name": "or",
+"stack": "( x1 x2 -- x3 )",
+"text": "Bitwise OR.",
+"section": "5.4 Logic and shifts",
+"area": "Logic and shifts",
+"related": [
+"and",
+"xor",
+"invert",
+"lshift",
+"rshift"
+],
+"examples": [
+"$48 1 i2c-addr drop -1 i2c-read 8 lshift 0 i2c-read or i2c-stop ;",
+": f@ ( lo hi -- x ) f-read 0 spi 0 spi f-end 8 lshift or ;  ok",
+": f@ ( lo hi -- x ) f-read 0 spi 0 spi f-end 8 lshift or ;"
+]
+},
+{
+"name": "xor",
+"stack": "( x1 x2 -- x3 )",
+"text": "Bitwise exclusive OR.",
+"section": "5.4 Logic and shifts",
+"area": "Logic and shifts",
+"related": [
+"and",
+"or",
+"invert",
+"lshift",
+"rshift"
+],
+"examples": []
+},
+{
+"name": "invert",
+"stack": "( x -- ~x )",
+"text": "Invert all bits. Also turns a true flag into false and back.",
+"section": "5.4 Logic and shifts",
+"area": "Logic and shifts",
+"related": [
+"and",
+"or",
+"xor",
+"lshift",
+"rshift"
+],
+"examples": []
+},
+{
+"name": "lshift",
+"stack": "( x u -- x' )",
+"text": "Shift left by u bits; u ≥ 16 gives 0.",
+"section": "5.4 Logic and shifts",
+"area": "Logic and shifts",
+"related": [
+"and",
+"or",
+"xor",
+"invert",
+"rshift"
+],
+"examples": [
+"$48 1 i2c-addr drop -1 i2c-read 8 lshift 0 i2c-read or i2c-stop ;",
+": f@ ( lo hi -- x ) f-read 0 spi 0 spi f-end 8 lshift or ;  ok",
+": runner begin 8 0 do 1 i lshift led! 100 ms loop key? until key drop 0 led! ;"
+]
+},
+{
+"name": "rshift",
+"stack": "( x u -- x' )",
+"text": "Logical shift right by u bits (fills with 0); u ≥ 16 gives 0.",
+"section": "5.4 Logic and shifts",
+"area": "Logic and shifts",
+"related": [
+"and",
+"or",
+"xor",
+"invert",
+"lshift"
+],
+"examples": []
+},
+{
+"name": "=",
+"stack": "( x1 x2 -- f )",
+"text": "Equal.",
+"section": "5.5 Comparison",
+"area": "Comparison",
+"related": [
+"<>",
+"<",
+">",
+"u<",
+"u>",
+"0=",
+"0<>",
+"0<",
+"0>",
+"within"
+],
+"examples": [
+"10 output 10 high   \\ D10 = chip select, idle high",
+": find3 10 0 do i 3 = if .\" found\" unloop exit then loop .\" none\" ;",
+"key? if key dup 27 = if drop exit then 0 uart-emit then"
+]
+},
+{
+"name": "<>",
+"stack": "( a b -- f )",
+"text": "Not equal.",
+"section": "5.5 Comparison",
+"area": "Comparison",
+"related": [
+"=",
+"<",
+">",
+"u<",
+"u>",
+"0=",
+"0<>",
+"0<",
+"0>",
+"within"
+],
+"examples": [
+"epin @ pin@ dup elast @ <> if 1 ecount +! then elast !"
+]
+},
+{
+"name": "<",
+"stack": "( n1 n2 -- f )",
+"text": "n1 less than n2, signed.",
+"section": "5.5 Comparison",
+"area": "Comparison",
+"related": [
+"=",
+"<>",
+">",
+"u<",
+"u>",
+"0=",
+"0<>",
+"0<",
+"0>",
+"within"
+],
+"examples": []
+},
+{
+"name": ">",
+"stack": "( a b -- f )",
+"text": "a greater than b, signed.",
+"section": "5.5 Comparison",
+"area": "Comparison",
+"related": [
+"=",
+"<>",
+"<",
+"u<",
+"u>",
+"0=",
+"0<>",
+"0<",
+"0>",
+"within"
+],
+"examples": [
+": fact ( n -- n! ) dup 1 > if dup 1- recurse * then ;",
+"ms@ over - 499 > if 5 toggle show drop ms@ then"
+]
+},
+{
+"name": "u<",
+"stack": "( u1 u2 -- f )",
+"text": "Less than, unsigned: -1 1 u< is false.",
+"section": "5.5 Comparison",
+"area": "Comparison",
+"related": [
+"=",
+"<>",
+"<",
+">",
+"u>",
+"0=",
+"0<>",
+"0<",
+"0>",
+"within"
+],
+"examples": []
+},
+{
+"name": "u>",
+"stack": "( a b -- f )",
+"text": "Greater than, unsigned.",
+"section": "5.5 Comparison",
+"area": "Comparison",
+"related": [
+"=",
+"<>",
+"<",
+">",
+"u<",
+"0=",
+"0<>",
+"0<",
+"0>",
+"within"
+],
+"examples": []
+},
+{
+"name": "0=",
+"stack": "( x -- f )",
+"text": "x is zero; also a logical NOT.",
+"section": "5.5 Comparison",
+"area": "Comparison",
+"related": [
+"=",
+"<>",
+"<",
+">",
+"u<",
+"u>",
+"0<>",
+"0<",
+"0>",
+"within"
+],
+"examples": [
+": wait-free begin btn@ 0= until ;",
+": count-press 1 presses +! presses @ led! begin btn@ 0= until ;",
+": watch6 begin 6 pin@ 0= 1 and led! key? until key drop 0 led! ;"
+]
+},
+{
+"name": "0<>",
+"stack": "( x -- f )",
+"text": "x is not zero.",
+"section": "5.5 Comparison",
+"area": "Comparison",
+"related": [
+"=",
+"<>",
+"<",
+">",
+"u<",
+"u>",
+"0=",
+"0<",
+"0>",
+"within"
+],
+"examples": []
+},
+{
+"name": "0<",
+"stack": "( n -- f )",
+"text": "n is negative.",
+"section": "5.5 Comparison",
+"area": "Comparison",
+"related": [
+"=",
+"<>",
+"<",
+">",
+"u<",
+"u>",
+"0=",
+"0<>",
+"0>",
+"within"
+],
+"examples": [
+"dup ms@ - 0<"
+]
+},
+{
+"name": "0>",
+"stack": "( n -- f )",
+"text": "n is positive.",
+"section": "5.5 Comparison",
+"area": "Comparison",
+"related": [
+"=",
+"<>",
+"<",
+">",
+"u<",
+"u>",
+"0=",
+"0<>",
+"0<",
+"within"
+],
+"examples": [
+": up? accel@ nip nip 0> if .\" face up\" else .\" face down\" then cr ;"
+]
+},
+{
+"name": "within",
+"stack": "( n lo hi -- f )",
+"text": "lo ≤ n < hi; works for signed and unsigned ranges.",
+"section": "5.5 Comparison",
+"area": "Comparison",
+"related": [
+"=",
+"<>",
+"<",
+">",
+"u<",
+"u>",
+"0=",
+"0<>",
+"0<",
+"0>"
+],
+"examples": [
+": edges ( pin ms -- n )   \\ level changes on the pin within ms milliseconds"
+]
+},
+{
+"name": "@",
+"stack": "( a -- x )",
+"text": "Fetch the cell at a (bit 0 of a ignored).",
+"section": "5.6 Memory",
+"area": "Memory",
+"related": [
+"!",
+"c@",
+"c!",
+"+!",
+"?",
+"cells",
+"cell+",
+"aligned",
+"cmove"
+],
+"examples": [
+"$8010 @ 255 and .   \\ read D0..D7 at once",
+"1000 0 pwm-hz  0 pwm @ u. 48000  ok",
+"1000 dds-hz  $8060 @ hex . decimal 5762  ok"
+]
+},
+{
+"name": "!",
+"stack": "( x a -- )",
+"text": "Store x at a.",
+"section": "5.6 Memory",
+"area": "Memory",
+"related": [
+"@",
+"c@",
+"c!",
+"+!",
+"?",
+"cells",
+"cell+",
+"aligned",
+"cmove"
+],
+"examples": [
+"variable x  5 x !  3 x +!  x ? 8  ok",
+"255 $8014 !   \\ D0..D7 as outputs",
+"170 $8012 !   \\ D1, D3, D5, D7 high, the others low"
+]
+},
+{
+"name": "c@",
+"stack": "( a -- c )",
+"text": "Fetch the byte at a.",
+"section": "5.6 Memory",
+"area": "Memory",
+"related": [
+"@",
+"!",
+"c!",
+"+!",
+"?",
+"cells",
+"cell+",
+"aligned",
+"cmove"
+],
+"examples": []
+},
+{
+"name": "c!",
+"stack": "( c a -- )",
+"text": "Store the low byte of c at a.",
+"section": "5.6 Memory",
+"area": "Memory",
+"related": [
+"@",
+"!",
+"c@",
+"+!",
+"?",
+"cells",
+"cell+",
+"aligned",
+"cmove"
+],
+"examples": []
+},
+{
+"name": "+!",
+"stack": "( n addr -- )",
+"text": "Add n to the cell at addr.",
+"section": "5.6 Memory",
+"area": "Memory",
+"related": [
+"@",
+"!",
+"c@",
+"c!",
+"?",
+"cells",
+"cell+",
+"aligned",
+"cmove"
+],
+"examples": [
+"variable x  5 x !  3 x +!  x ? 8  ok",
+": bump 1 count +! ;",
+": count-press 1 presses +! presses @ led! begin btn@ 0= until ;"
+]
+},
+{
+"name": "?",
+"stack": "( a -- )",
+"text": "Print the cell at a, like @ ..",
+"section": "5.6 Memory",
+"area": "Memory",
+"related": [
+"@",
+"!",
+"c@",
+"c!",
+"+!",
+"cells",
+"cell+",
+"aligned",
+"cmove"
+],
+"examples": [
+"variable x  5 x !  3 x +!  x ? 8  ok",
+"table 2 cells + ? 4  ok",
+".\" pressed \" presses ? .\" times\" cr ;"
+]
+},
+{
+"name": "cells",
+"stack": "( n -- n*2 )",
+"text": "Size of n cells in bytes.",
+"section": "5.6 Memory",
+"area": "Memory",
+"related": [
+"@",
+"!",
+"c@",
+"c!",
+"+!",
+"?",
+"cell+",
+"aligned",
+"cmove"
+],
+"examples": [
+"table 2 cells + ? 4  ok",
+": sample ( i -- a ) cells samples + ;"
+]
+},
+{
+"name": "cell+",
+"stack": "( a -- a+2 )",
+"text": "Address of the next cell.",
+"section": "5.6 Memory",
+"area": "Memory",
+"related": [
+"@",
+"!",
+"c@",
+"c!",
+"+!",
+"?",
+"cells",
+"aligned",
+"cmove"
+],
+"examples": []
+},
+{
+"name": "aligned",
+"stack": "( a -- a' )",
+"text": "Round a up to an even address.",
+"section": "5.6 Memory",
+"area": "Memory",
+"related": [
+"@",
+"!",
+"c@",
+"c!",
+"+!",
+"?",
+"cells",
+"cell+",
+"cmove"
+],
+"examples": []
+},
+{
+"name": "cmove",
+"stack": "( src dst n -- )",
+"text": "Copy n bytes from src to dst, lowest address first.",
+"section": "5.6 Memory",
+"area": "Memory",
+"related": [
+"@",
+"!",
+"c@",
+"c!",
+"+!",
+"?",
+"cells",
+"cell+",
+"aligned"
+],
+"examples": []
+},
+{
+"name": "here",
+"stack": "( -- a )",
+"text": "Address of the next free byte.",
+"section": "5.7 Dictionary space and data RAM",
+"area": "Dictionary space and data RAM",
+"related": [
+"allot",
+"align",
+",",
+"c,",
+"unused",
+"buffer:",
+"unused-data"
+],
+"examples": []
+},
+{
+"name": "allot",
+"stack": "( n -- )",
+"text": "Reserve n bytes at here (a negative n gives memory back).",
+"section": "5.7 Dictionary space and data RAM",
+"area": "Dictionary space and data RAM",
+"related": [
+"here",
+"align",
+",",
+"c,",
+"unused",
+"buffer:",
+"unused-data"
+],
+"examples": [
+"create buffer 20 allot"
+]
+},
+{
+"name": "align",
+"stack": "( -- )",
+"text": "Make here even.",
+"section": "5.7 Dictionary space and data RAM",
+"area": "Dictionary space and data RAM",
+"related": [
+"here",
+"allot",
+",",
+"c,",
+"unused",
+"buffer:",
+"unused-data"
+],
+"examples": []
+},
+{
+"name": ",",
+"stack": "( x -- )",
+"text": "Align, store x at here, advance by one cell.",
+"section": "5.7 Dictionary space and data RAM",
+"area": "Dictionary space and data RAM",
+"related": [
+"here",
+"allot",
+"align",
+"c,",
+"unused",
+"buffer:",
+"unused-data"
+],
+"examples": [
+"create table 1 , 2 , 4 , 8 ,"
+]
+},
+{
+"name": "c,",
+"stack": "( c -- )",
+"text": "Store a byte at here, advance by one byte.",
+"section": "5.7 Dictionary space and data RAM",
+"area": "Dictionary space and data RAM",
+"related": [
+"here",
+"allot",
+"align",
+",",
+"unused",
+"buffer:",
+"unused-data"
+],
+"examples": []
+},
+{
+"name": "unused",
+"stack": "( -- n )",
+"text": "Free code space: $4000\"minus \"here.",
+"section": "5.7 Dictionary space and data RAM",
+"area": "Dictionary space and data RAM",
+"related": [
+"here",
+"allot",
+"align",
+",",
+"c,",
+"buffer:",
+"unused-data"
+],
+"examples": []
+},
+{
+"name": "buffer:",
+"stack": "( n \"name\" -- )",
+"text": "Reserve n bytes of data RAM (rounded up to even, so cells stay aligned); name\"then pushes their address. \" data RAM full if fewer than n bytes are left.",
+"section": "5.7 Dictionary space and data RAM",
+"area": "Dictionary space and data RAM",
+"related": [
+"here",
+"allot",
+"align",
+",",
+"c,",
+"unused",
+"unused-data"
+],
+"examples": [
+"100 buffer: buf  ok",
+"128 buffer: samples"
+]
+},
+{
+"name": "unused-data",
+"stack": "( -- n )",
+"text": "Free data RAM in bytes.",
+"section": "5.7 Dictionary space and data RAM",
+"area": "Dictionary space and data RAM",
+"related": [
+"here",
+"allot",
+"align",
+",",
+"c,",
+"unused",
+"buffer:"
+],
+"examples": [
+"buf . unused-data . 16384 7068  ok"
+]
+},
+{
+"name": "key",
+"stack": "( -- c )",
+"text": "Wait for a character from the terminal. Answers the app's requests while it waits.",
+"section": "5.8 Terminal input and output",
+"area": "Terminal input and output",
+"related": [
+"key?",
+"emit",
+"cr",
+"space",
+"spaces",
+"type",
+".",
+"u.",
+".\"",
+".("
+],
+"examples": [
+": runner begin 8 0 do 1 i lshift led! 100 ms loop key? until key drop 0 led! ;",
+": alternate ( -- )   \\ LED1 and LED2 take turns; any key stops",
+"begin 1 led-toggle 2 led-toggle 250 ms key? until key drop 0 led! ;"
+]
+},
+{
+"name": "key?",
+"stack": "( -- f )",
+"text": "True if a character is waiting (does not take it). Answers the app's requests waiting before it.",
+"section": "5.8 Terminal input and output",
+"area": "Terminal input and output",
+"related": [
+"key",
+"emit",
+"cr",
+"space",
+"spaces",
+"type",
+".",
+"u.",
+".\"",
+".("
+],
+"examples": [
+": runner begin 8 0 do 1 i lshift led! 100 ms loop key? until key drop 0 led! ;",
+"begin 1 led-toggle 2 led-toggle 250 ms key? until key drop 0 led! ;",
+": mirror begin btn@ led! key? until key drop 0 led! ;"
+]
+},
+{
+"name": "emit",
+"stack": "( c -- )",
+"text": "Send a character (waits while the 1 KB send FIFO is full).",
+"section": "5.8 Terminal input and output",
+"area": "Terminal input and output",
+"related": [
+"key",
+"key?",
+"cr",
+"space",
+"spaces",
+"type",
+".",
+"u.",
+".\"",
+".("
+],
+"examples": [
+": show ( -- ) begin 0 uart-key? while 0 uart-key emit repeat ;",
+"0 uart-key? if 0 uart-key emit then"
+]
+},
+{
+"name": "cr",
+"stack": "( -- )",
+"text": "New line (sends CR and LF).",
+"section": "5.8 Terminal input and output",
+"area": "Terminal input and output",
+"related": [
+"key",
+"key?",
+"emit",
+"space",
+"spaces",
+"type",
+".",
+"u.",
+".\"",
+".("
+],
+"examples": [
+": hello .\" Hello, MAX1000!\" cr ;",
+".\" wait for the LEDs...\" cr",
+".\" reaction time \" . .\" ms\" cr"
+]
+},
+{
+"name": "space",
+"stack": "( -- )",
+"text": "Send one space.",
+"section": "5.8 Terminal input and output",
+"area": "Terminal input and output",
+"related": [
+"key",
+"key?",
+"emit",
+"cr",
+"spaces",
+"type",
+".",
+"u.",
+".\"",
+".("
+],
+"examples": []
+},
+{
+"name": "spaces",
+"stack": "( n -- )",
+"text": "Send n spaces (nothing for n ≤ 0).",
+"section": "5.8 Terminal input and output",
+"area": "Terminal input and output",
+"related": [
+"key",
+"key?",
+"emit",
+"cr",
+"space",
+"type",
+".",
+"u.",
+".\"",
+".("
+],
+"examples": []
+},
+{
+"name": "type",
+"stack": "( a n -- )",
+"text": "Send n characters starting at a.",
+"section": "5.8 Terminal input and output",
+"area": "Terminal input and output",
+"related": [
+"key",
+"key?",
+"emit",
+"cr",
+"space",
+"spaces",
+".",
+"u.",
+".\"",
+".("
+],
+"examples": []
+},
+{
+"name": ".",
+"stack": "( n -- )",
+"text": "Print a signed number in the current base, then a space.",
+"section": "5.8 Terminal input and output",
+"area": "Terminal input and output",
+"related": [
+"key",
+"key?",
+"emit",
+"cr",
+"space",
+"spaces",
+"type",
+"u.",
+".\"",
+".("
+],
+"examples": [
+"buf . unused-data . 16384 7068  ok",
+"led@ .   \\ prints 132 ($84)",
+"btn@ .   \\ hold the USER button while pressing Enter: prints -1"
+]
+},
+{
+"name": "u.",
+"stack": "( u -- )",
+"text": "Print an unsigned number, then a space: -1 u. gives 65535.",
+"section": "5.8 Terminal input and output",
+"area": "Terminal input and output",
+"related": [
+"key",
+"key?",
+"emit",
+"cr",
+"space",
+"spaces",
+"type",
+".",
+".\"",
+".("
+],
+"examples": [
+"1000 0 pwm-hz  0 pwm @ u. 48000  ok",
+"hex crc-test u. u. decimal CBF4 3926  ok"
+]
+},
+{
+"name": ".\"",
+"stack": "( -- )",
+"text": "Compile only: print text when the definition runs.",
+"section": "5.8 Terminal input and output",
+"area": "Terminal input and output",
+"related": [
+"key",
+"key?",
+"emit",
+"cr",
+"space",
+"spaces",
+"type",
+".",
+"u.",
+".("
+],
+"examples": [
+": hello .\" Hello, MAX1000!\" cr ;",
+": find3 10 0 do i 3 = if .\" found\" unloop exit then loop .\" none\" ;",
+": shout .\" loud\" ; immediate"
+]
+},
+{
+"name": ".(",
+"stack": "( -- )",
+"text": "Print text immediately, in a definition or at the terminal.",
+"section": "5.8 Terminal input and output",
+"area": "Terminal input and output",
+"related": [
+"key",
+"key?",
+"emit",
+"cr",
+"space",
+"spaces",
+"type",
+".",
+"u.",
+".\""
+],
+"examples": []
+},
+{
+"name": "base",
+"stack": "( -- a )",
+"text": "Variable holding the base for number input and output (2..36).",
+"section": "5.9 Number base",
+"area": "Number base",
+"related": [
+"hex",
+"decimal"
+],
+"examples": []
+},
+{
+"name": "hex",
+"stack": "( -- )",
+"text": "Set the base to 16.",
+"section": "5.9 Number base",
+"area": "Number base",
+"related": [
+"base",
+"decimal"
+],
+"examples": [
+"1000 dds-hz  $8060 @ hex . decimal 5762  ok",
+"hex flash-id . . . decimal 17 40 EF  ok",
+"hex crc-test u. u. decimal CBF4 3926  ok"
+]
+},
+{
+"name": "decimal",
+"stack": "( -- )",
+"text": "Set the base to 10.",
+"section": "5.9 Number base",
+"area": "Number base",
+"related": [
+"base",
+"hex"
+],
+"examples": [
+"1000 dds-hz  $8060 @ hex . decimal 5762  ok",
+"hex flash-id . . . decimal 17 40 EF  ok",
+"hex crc-test u. u. decimal CBF4 3926  ok"
+]
+},
+{
+"name": "led!",
+"stack": "( n -- )",
+"text": "Set LED1..LED8 from bits 0..7 of n (1 = on; bit 0 = LED1).",
+"section": "5.10 Board I/O",
+"area": "Board I/O",
+"related": [
+"led@",
+"led-on",
+"led-off",
+"led-toggle",
+"led-mask",
+"btn@",
+"ms",
+"ms@"
+],
+"examples": [
+"$81 led!   \\ LED1 and LED8 on, all others off",
+": count256 256 0 do i led! 30 ms loop 0 led! ;",
+": runner begin 8 0 do 1 i lshift led! 100 ms loop key? until key drop 0 led! ;"
+]
+},
+{
+"name": "led@",
+"stack": "( -- n )",
+"text": "Read back the LED state.",
+"section": "5.10 Board I/O",
+"area": "Board I/O",
+"related": [
+"led!",
+"led-on",
+"led-off",
+"led-toggle",
+"led-mask",
+"btn@",
+"ms",
+"ms@"
+],
+"examples": [
+"led@ .   \\ prints 132 ($84)"
+]
+},
+{
+"name": "led-on",
+"stack": "( n -- )",
+"text": "Switch LED n (1..8) on; the other LEDs stay as they are.",
+"section": "5.10 Board I/O",
+"area": "Board I/O",
+"related": [
+"led!",
+"led@",
+"led-off",
+"led-toggle",
+"led-mask",
+"btn@",
+"ms",
+"ms@"
+],
+"examples": [
+"3 led-on   \\ LED3 on as well: LED1, LED3 and LED8 are lit",
+"0 led! 1 led-on"
+]
+},
+{
+"name": "led-off",
+"stack": "( n -- )",
+"text": "Switch LED n (1..8) off; the other LEDs stay as they are.",
+"section": "5.10 Board I/O",
+"area": "Board I/O",
+"related": [
+"led!",
+"led@",
+"led-on",
+"led-toggle",
+"led-mask",
+"btn@",
+"ms",
+"ms@"
+],
+"examples": [
+"1 led-off   \\ LED1 off: LED3 and LED8 stay on"
+]
+},
+{
+"name": "led-toggle",
+"stack": "( n -- )",
+"text": "Change LED n (1..8): on becomes off, off becomes on.",
+"section": "5.10 Board I/O",
+"area": "Board I/O",
+"related": [
+"led!",
+"led@",
+"led-on",
+"led-off",
+"led-mask",
+"btn@",
+"ms",
+"ms@"
+],
+"examples": [
+": blink3 10 0 do 3 led-toggle 200 ms loop ;",
+"begin 1 led-toggle 2 led-toggle 250 ms key? until key drop 0 led! ;"
+]
+},
+{
+"name": "led-mask",
+"stack": "( n -- mask )",
+"text": "The bit of LED n in led!\"(1 for LED1 … 128 for LED8); \" bad led for n outside 1..8.",
+"section": "5.10 Board I/O",
+"area": "Board I/O",
+"related": [
+"led!",
+"led@",
+"led-on",
+"led-off",
+"led-toggle",
+"btn@",
+"ms",
+"ms@"
+],
+"examples": []
+},
+{
+"name": "btn@",
+"stack": "( -- f )",
+"text": "The USER button: true while pressed. Debounced (sampled every 10 ms).",
+"section": "5.10 Board I/O",
+"area": "Board I/O",
+"related": [
+"led!",
+"led@",
+"led-on",
+"led-off",
+"led-toggle",
+"led-mask",
+"ms",
+"ms@"
+],
+"examples": [
+"btn@ .   \\ hold the USER button while pressing Enter: prints -1",
+": mirror begin btn@ led! key? until key drop 0 led! ;",
+": wait-btn begin btn@ until ;"
+]
+},
+{
+"name": "ms",
+"stack": "( n -- )",
+"text": "Wait n milliseconds (0..32767). Answers the app's requests while it waits.",
+"section": "5.10 Board I/O",
+"area": "Board I/O",
+"related": [
+"led!",
+"led@",
+"led-on",
+"led-off",
+"led-toggle",
+"led-mask",
+"btn@",
+"ms@"
+],
+"examples": [
+": blink3 10 0 do 3 led-toggle 200 ms loop ;",
+"2 1 pwm-hz  100 1 pwm-duty  4 1 pwm-pin   \\ D4: 2 Hz, 50 ms pulses",
+": count256 256 0 do i led! 30 ms loop 0 led! ;"
+]
+},
+{
+"name": "ms@",
+"stack": "( -- n )",
+"text": "Millisecond counter; wraps every 65.536 s.",
+"section": "5.10 Board I/O",
+"area": "Board I/O",
+"related": [
+"led!",
+"led@",
+"led-on",
+"led-off",
+"led-toggle",
+"led-mask",
+"btn@",
+"ms"
+],
+"examples": [
+"2000 ms 255 led! ms@",
+"wait-btn ms@ swap - 0 led!",
+"ms@ + begin"
+]
+},
+{
+"name": "output",
+"stack": "( n -- )",
+"text": "Make pin n an output.",
+"section": "5.11 Digital pins",
+"area": "Digital pins",
+"related": [
+"input",
+"high",
+"low",
+"toggle",
+"pin!",
+"pin@",
+"pin",
+"bset",
+"bclr",
+"owner"
+],
+"examples": [
+"3 output  3 high   \\ D3 to 3.3 V",
+"10 output 10 high   \\ D10 = chip select, idle high",
+": blink3 3 output begin 3 toggle 250 ms key? until key drop 3 low ;"
+]
+},
+{
+"name": "input",
+"stack": "( n -- )",
+"text": "Make pin n an input again.",
+"section": "5.11 Digital pins",
+"area": "Digital pins",
+"related": [
+"output",
+"high",
+"low",
+"toggle",
+"pin!",
+"pin@",
+"pin",
+"bset",
+"bclr",
+"owner"
+],
+"examples": [
+"3 low  3 input   \\ back to an input",
+"0 output  0 high  1 pin@ .  0 low  1 pin@ .  0 input",
+"3 output  3 high  10 ms  0 mv@ .  3 low  10 ms  0 mv@ .  3 input"
+]
+},
+{
+"name": "high",
+"stack": "( n -- )",
+"text": "Set the pin's output latch to 1 (3.3 V when it is an output).",
+"section": "5.11 Digital pins",
+"area": "Digital pins",
+"related": [
+"output",
+"input",
+"low",
+"toggle",
+"pin!",
+"pin@",
+"pin",
+"bset",
+"bclr",
+"owner"
+],
+"examples": [
+"3 output  3 high   \\ D3 to 3.3 V",
+"1000 0 pwm-hz  250 0 pwm-duty  3 0 pwm-pin   \\ D3: 1 kHz, 25 % high",
+"10 output 10 high   \\ D10 = chip select, idle high"
+]
+},
+{
+"name": "low",
+"stack": "( n -- )",
+"text": "Set the output latch to 0.",
+"section": "5.11 Digital pins",
+"area": "Digital pins",
+"related": [
+"output",
+"input",
+"high",
+"toggle",
+"pin!",
+"pin@",
+"pin",
+"bset",
+"bclr",
+"owner"
+],
+"examples": [
+"3 low  3 input   \\ back to an input",
+"170 $8012 !   \\ D1, D3, D5, D7 high, the others low",
+"10 low $9F 0 spi-xfer drop 0 0 spi-xfer . 10 high"
+]
+},
+{
+"name": "toggle",
+"stack": "( n -- )",
+"text": "Invert the output latch.",
+"section": "5.11 Digital pins",
+"area": "Digital pins",
+"related": [
+"output",
+"input",
+"high",
+"low",
+"pin!",
+"pin@",
+"pin",
+"bset",
+"bclr",
+"owner"
+],
+"examples": [
+": blink3 3 output begin 3 toggle 250 ms key? until key drop 3 low ;",
+"ms@ over - 499 > if 5 toggle show drop ms@ then"
+]
+},
+{
+"name": "pin!",
+"stack": "( f n -- )",
+"text": "high\"if f is true, otherwise \"low.",
+"section": "5.11 Digital pins",
+"area": "Digital pins",
+"related": [
+"output",
+"input",
+"high",
+"low",
+"toggle",
+"pin@",
+"pin",
+"bset",
+"bclr",
+"owner"
+],
+"examples": [
+"6 pin@ 0= 4 pin!"
+]
+},
+{
+"name": "pin@",
+"stack": "( n -- f )",
+"text": "Read the level at the pin: true = high. Also works on outputs, where it reads back the driven level.",
+"section": "5.11 Digital pins",
+"area": "Digital pins",
+"related": [
+"output",
+"input",
+"high",
+"low",
+"toggle",
+"pin!",
+"pin",
+"bset",
+"bclr",
+"owner"
+],
+"examples": [
+"3 pin@ . -1  ok",
+": watch6 begin 6 pin@ 0= 1 and led! key? until key drop 0 led! ;",
+"0 output  0 high  1 pin@ .  0 low  1 pin@ .  0 input"
+]
+},
+{
+"name": "pin",
+"stack": "( n -- mask a )",
+"text": "Bit mask and port address of pin n; \"bad pin\" for numbers that are not pins.",
+"section": "5.11 Digital pins",
+"area": "Digital pins",
+"related": [
+"output",
+"input",
+"high",
+"low",
+"toggle",
+"pin!",
+"pin@",
+"bset",
+"bclr",
+"owner"
+],
+"examples": [
+": edges ( pin ms -- n )   \\ level changes on the pin within ms milliseconds"
+]
+},
+{
+"name": "bset",
+"stack": "( mask a -- )",
+"text": "Set the mask bits in the cell at a (a general helper).",
+"section": "5.11 Digital pins",
+"area": "Digital pins",
+"related": [
+"output",
+"input",
+"high",
+"low",
+"toggle",
+"pin!",
+"pin@",
+"pin",
+"bclr",
+"owner"
+],
+"examples": []
+},
+{
+"name": "bclr",
+"stack": "( mask a -- )",
+"text": "Clear the mask bits in the cell at a.",
+"section": "5.11 Digital pins",
+"area": "Digital pins",
+"related": [
+"output",
+"input",
+"high",
+"low",
+"toggle",
+"pin!",
+"pin@",
+"pin",
+"bset",
+"owner"
+],
+"examples": []
+},
+{
+"name": "owner",
+"stack": "( n -- id )",
+"text": "Who has pin n (section 5.15): 0 = nobody (the pin follows its latch and direction), 1..4 = PWM channel 0..3, 5, 6 = UART 0, 1, 7, 8 = SPI 0, 1, 9 = I2C, 10 = DDS.",
+"section": "5.11 Digital pins",
+"area": "Digital pins",
+"related": [
+"output",
+"input",
+"high",
+"low",
+"toggle",
+"pin!",
+"pin@",
+"pin",
+"bset",
+"bclr"
+],
+"examples": []
+},
+{
+"name": "adc@",
+"stack": "( n -- u )",
+"text": "Raw result of input n (0..8, the table above): 0..4095 for 0 to 3.3 V. \"bad input\" for other numbers.",
+"section": "5.12 Analog inputs and temperature",
+"area": "Analog inputs and temperature",
+"related": [
+"mv@",
+"adc-ch@",
+"ain",
+"temp-code@",
+"temp@",
+".temp"
+],
+"examples": [
+": level ( -- n ) 3 adc@ 9 4096 */ 1 swap lshift 1- ;"
+]
+},
+{
+"name": "mv@",
+"stack": "( n -- mv )",
+"text": "The input's voltage in millivolts: 0..3299.",
+"section": "5.12 Analog inputs and temperature",
+"area": "Analog inputs and temperature",
+"related": [
+"adc@",
+"adc-ch@",
+"ain",
+"temp-code@",
+"temp@",
+".temp"
+],
+"examples": [
+"3 mv@ . 1650  ok   \\ for example: a potentiometer half way",
+": volts begin 3 mv@ . .\" mV\" cr 500 ms key? until key drop ;",
+"3 output  3 high  10 ms  0 mv@ .  3 low  10 ms  0 mv@ .  3 input"
+]
+},
+{
+"name": "adc-ch@",
+"stack": "( c -- u )",
+"text": "Raw result of ADC channel c, 0..8, in the converter's own numbering; 9 is the temperature diode.",
+"section": "5.12 Analog inputs and temperature",
+"area": "Analog inputs and temperature",
+"related": [
+"adc@",
+"mv@",
+"ain",
+"temp-code@",
+"temp@",
+".temp"
+],
+"examples": []
+},
+{
+"name": "ain",
+"stack": "( -- a )",
+"text": "Table of 9 bytes: the ADC channel of each input (used by adc@).",
+"section": "5.12 Analog inputs and temperature",
+"area": "Analog inputs and temperature",
+"related": [
+"adc@",
+"mv@",
+"adc-ch@",
+"temp-code@",
+"temp@",
+".temp"
+],
+"examples": []
+},
+{
+"name": "temp-code@",
+"stack": "( -- u )",
+"text": "Raw code of the temperature sensing diode, a running average of 64 samples. It falls as the chip warms.",
+"section": "5.12 Analog inputs and temperature",
+"area": "Analog inputs and temperature",
+"related": [
+"adc@",
+"mv@",
+"adc-ch@",
+"ain",
+"temp@",
+".temp"
+],
+"examples": [
+"temp-code@ . 3640  ok"
+]
+},
+{
+"name": "temp@",
+"stack": "( -- n )",
+"text": "Chip temperature in tenths of a degree Celsius: 346 means 34.6 °C.",
+"section": "5.12 Analog inputs and temperature",
+"area": "Analog inputs and temperature",
+"related": [
+"adc@",
+"mv@",
+"adc-ch@",
+"ain",
+"temp-code@",
+".temp"
+],
+"examples": []
+},
+{
+"name": ".temp",
+"stack": "( -- )",
+"text": "Print the chip temperature, for example 34.6 C.",
+"section": "5.12 Analog inputs and temperature",
+"area": "Analog inputs and temperature",
+"related": [
+"adc@",
+"mv@",
+"adc-ch@",
+"ain",
+"temp-code@",
+"temp@"
+],
+"examples": [
+".temp 34.6 C  ok",
+": thermo begin .temp cr 1000 ms key? until key drop ;"
+]
+},
+{
+"name": "pwm-pin",
+"stack": "( pin ch -- )",
+"text": "Route channel ch to the pin and start it. The pin becomes an output driven by the channel; \"bad pin\" for numbers that are not pins, \"pin taken\" if another channel, the DDS or a serial interface has it. A channel that had another pin lets it go.",
+"section": "5.13 PWM",
+"area": "PWM",
+"related": [
+"pwm-off",
+"pwm-hz",
+"pwm-khz",
+"pwm-duty",
+"pwm-clocks",
+"pwm",
+"ud/u"
+],
+"examples": [
+"1000 0 pwm-hz  250 0 pwm-duty  3 0 pwm-pin   \\ D3: 1 kHz, 25 % high",
+"2 1 pwm-hz  100 1 pwm-duty  4 1 pwm-pin   \\ D4: 2 Hz, 50 ms pulses",
+"1000 0 pwm-hz  100 0 pwm-duty  3 0 pwm-pin   \\ 10 % brightness"
+]
+},
+{
+"name": "pwm-off",
+"stack": "( ch -- )",
+"text": "Stop the channel. Its pin returns to its own latch and direction (an input after start-up).",
+"section": "5.13 PWM",
+"area": "PWM",
+"related": [
+"pwm-pin",
+"pwm-hz",
+"pwm-khz",
+"pwm-duty",
+"pwm-clocks",
+"pwm",
+"ud/u"
+],
+"examples": [
+"0 pwm-off  1 pwm-off",
+"0 pwm-off",
+"begin ramp-up ramp-down key? until key drop 0 pwm-off ;"
+]
+},
+{
+"name": "pwm-hz",
+"stack": "( u ch -- )",
+"text": "Frequency in Hz, 1..65535; \"bad frequency\" for 0.",
+"section": "5.13 PWM",
+"area": "PWM",
+"related": [
+"pwm-pin",
+"pwm-off",
+"pwm-khz",
+"pwm-duty",
+"pwm-clocks",
+"pwm",
+"ud/u"
+],
+"examples": [
+"1000 0 pwm-hz  250 0 pwm-duty  3 0 pwm-pin   \\ D3: 1 kHz, 25 % high",
+"2 1 pwm-hz  100 1 pwm-duty  4 1 pwm-pin   \\ D4: 2 Hz, 50 ms pulses",
+"1000 0 pwm-hz  0 pwm @ u. 48000  ok"
+]
+},
+{
+"name": "pwm-khz",
+"stack": "( u ch -- )",
+"text": "Frequency in kHz, 1..24000; \"bad frequency\" outside.",
+"section": "5.13 PWM",
+"area": "PWM",
+"related": [
+"pwm-pin",
+"pwm-off",
+"pwm-hz",
+"pwm-duty",
+"pwm-clocks",
+"pwm",
+"ud/u"
+],
+"examples": [
+"10 0 pwm-khz  3 0 pwm-pin"
+]
+},
+{
+"name": "pwm-duty",
+"stack": "( permille ch -- )",
+"text": "Duty cycle in ‰ (tenths of a percent), 0..1000: 0 is always low, 1000 always high; values outside are clamped.",
+"section": "5.13 PWM",
+"area": "PWM",
+"related": [
+"pwm-pin",
+"pwm-off",
+"pwm-hz",
+"pwm-khz",
+"pwm-clocks",
+"pwm",
+"ud/u"
+],
+"examples": [
+"1000 0 pwm-hz  250 0 pwm-duty  3 0 pwm-pin   \\ D3: 1 kHz, 25 % high",
+"500 0 pwm-duty   \\ now 50 %",
+"2 1 pwm-hz  100 1 pwm-duty  4 1 pwm-pin   \\ D4: 2 Hz, 50 ms pulses"
+]
+},
+{
+"name": "pwm-clocks",
+"stack": "( ud ch -- )",
+"text": "The period directly, in 48 MHz clocks (20.8 ns), as a double number: low cell, then high cell. At least 2.",
+"section": "5.13 PWM",
+"area": "PWM",
+"related": [
+"pwm-pin",
+"pwm-off",
+"pwm-hz",
+"pwm-khz",
+"pwm-duty",
+"pwm",
+"ud/u"
+],
+"examples": []
+},
+{
+"name": "pwm",
+"stack": "( ch -- a )",
+"text": "Register address of channel ch; \"bad channel\" for ch above 3.",
+"section": "5.13 PWM",
+"area": "PWM",
+"related": [
+"pwm-pin",
+"pwm-off",
+"pwm-hz",
+"pwm-khz",
+"pwm-duty",
+"pwm-clocks",
+"ud/u"
+],
+"examples": [
+"1000 0 pwm-hz  0 pwm @ u. 48000  ok"
+]
+},
+{
+"name": "ud/u",
+"stack": "( ud u -- ud' )",
+"text": "Unsigned double divided by an unsigned single, giving a double quotient (used by pwm-hz).",
+"section": "5.13 PWM",
+"area": "PWM",
+"related": [
+"pwm-pin",
+"pwm-off",
+"pwm-hz",
+"pwm-khz",
+"pwm-duty",
+"pwm-clocks",
+"pwm"
+],
+"examples": []
+},
+{
+"name": "dds-hz",
+"stack": "( u -- )",
+"text": "Frequency in Hz, 0..65535.",
+"section": "5.14 DDS square-wave generator",
+"area": "DDS square-wave generator",
+"related": [
+"dds-khz",
+"dds-tuning",
+"dds-pin",
+"dds-off",
+"dds-sync"
+],
+"examples": [
+"1000 dds-hz  3 dds-pin   \\ D3: 1 kHz",
+"1000 dds-hz  $8060 @ hex . decimal 5762  ok",
+"1000 dds-hz  3 dds-pin  3 1000 edges .  dds-off"
+]
+},
+{
+"name": "dds-khz",
+"stack": "( u -- )",
+"text": "Frequency in kHz, 0..65535 (up to 65.5 MHz).",
+"section": "5.14 DDS square-wave generator",
+"area": "DDS square-wave generator",
+"related": [
+"dds-hz",
+"dds-tuning",
+"dds-pin",
+"dds-off",
+"dds-sync"
+],
+"examples": [
+"1500 dds-khz   \\ now 1.5 MHz"
+]
+},
+{
+"name": "dds-tuning",
+"stack": "( ud -- )",
+"text": "The phase step directly: f = ud × 192 MHz / 2³² (low cell, then high cell).",
+"section": "5.14 DDS square-wave generator",
+"area": "DDS square-wave generator",
+"related": [
+"dds-hz",
+"dds-khz",
+"dds-pin",
+"dds-off",
+"dds-sync"
+],
+"examples": []
+},
+{
+"name": "dds-pin",
+"stack": "( pin -- )",
+"text": "Route the DDS to the pin and start it at phase 0; \"bad pin\" for numbers that are not pins, \"pin taken\" if a PWM channel or a serial interface has it.",
+"section": "5.14 DDS square-wave generator",
+"area": "DDS square-wave generator",
+"related": [
+"dds-hz",
+"dds-khz",
+"dds-tuning",
+"dds-off",
+"dds-sync"
+],
+"examples": [
+"1000 dds-hz  3 dds-pin   \\ D3: 1 kHz",
+"1000 dds-hz  3 dds-pin  3 1000 edges .  dds-off",
+"100 dds-hz 7 dds-pin"
+]
+},
+{
+"name": "dds-off",
+"stack": "( -- )",
+"text": "Stop it; the pin returns to its own latch and direction.",
+"section": "5.14 DDS square-wave generator",
+"area": "DDS square-wave generator",
+"related": [
+"dds-hz",
+"dds-khz",
+"dds-tuning",
+"dds-pin",
+"dds-sync"
+],
+"examples": [
+"dds-off",
+"1000 dds-hz  3 dds-pin  3 1000 edges .  dds-off",
+"100 0 do i 100 * 100 + dds-hz 20 ms loop dds-off ;"
+]
+},
+{
+"name": "dds-sync",
+"stack": "( -- )",
+"text": "Wait until the generator has taken over the last change (the others do this themselves).",
+"section": "5.14 DDS square-wave generator",
+"area": "DDS square-wave generator",
+"related": [
+"dds-hz",
+"dds-khz",
+"dds-tuning",
+"dds-pin",
+"dds-off"
+],
+"examples": []
+},
+{
+"name": "uart-open",
+"stack": "( ud-baud tx rx u -- )",
+"text": "Open UART u at the baud rate, a double number (115200.), with TX and RX on the given pins. \"bad baud\" for 0 or less than 3 Bd; above 6,000,000 Bd it runs at 6 MBd. Opening an open UART again moves it to the new pins and rate.",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"uart-close",
+"uart-emit",
+"uart-type",
+"uart-key?",
+"uart-key",
+"uart-status"
+],
+"examples": [
+"115200. 0 1 0 uart-open   \\ UART 0: TX on D0, RX on D1",
+"115200. 7 7 0 uart-open   \\ UART 0, TX and RX on D7",
+"9600. 0 1 0 uart-open bridge"
+]
+},
+{
+"name": "uart-close",
+"stack": "( u -- )",
+"text": "Close it and empty its buffers; its pins return to their own latch and direction.",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"uart-open",
+"uart-emit",
+"uart-type",
+"uart-key?",
+"uart-key",
+"uart-status"
+],
+"examples": [
+"0 uart-close"
+]
+},
+{
+"name": "uart-emit",
+"stack": "( c u -- )",
+"text": "Send a byte; waits only while the send buffer is full.",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"uart-open",
+"uart-close",
+"uart-type",
+"uart-key?",
+"uart-key",
+"uart-status"
+],
+"examples": [
+"72 0 uart-emit 105 0 uart-emit",
+": send ( -- ) 10 0 do 48 i + 0 uart-emit loop ;",
+"key? if key dup 27 = if drop exit then 0 uart-emit then"
+]
+},
+{
+"name": "uart-type",
+"stack": "( a n u -- )",
+"text": "Send n bytes from a.",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"uart-open",
+"uart-close",
+"uart-emit",
+"uart-key?",
+"uart-key",
+"uart-status"
+],
+"examples": []
+},
+{
+"name": "uart-key?",
+"stack": "( u -- f )",
+"text": "True if a byte has arrived.",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"uart-open",
+"uart-close",
+"uart-emit",
+"uart-type",
+"uart-key",
+"uart-status"
+],
+"examples": [
+"0 uart-key? .   \\ -1 if something came back",
+": show ( -- ) begin 0 uart-key? while 0 uart-key emit repeat ;",
+"0 uart-key? if 0 uart-key emit then"
+]
+},
+{
+"name": "uart-key",
+"stack": "( u -- c )",
+"text": "The next byte, waiting for it. The app's requests are answered while it waits.",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"uart-open",
+"uart-close",
+"uart-emit",
+"uart-type",
+"uart-key?",
+"uart-status"
+],
+"examples": [
+": show ( -- ) begin 0 uart-key? while 0 uart-key emit repeat ;",
+"0 uart-key? if 0 uart-key emit then"
+]
+},
+{
+"name": "uart-status",
+"stack": "( u -- bits )",
+"text": "Bit 2 = everything sent, bit 3 = bytes were lost (the receive buffer was full), bit 4 = a framing error (wrong baud rate, or a break). Reading clears bits 3 and 4.",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"uart-open",
+"uart-close",
+"uart-emit",
+"uart-type",
+"uart-key?",
+"uart-key"
+],
+"examples": []
+},
+{
+"name": "spi-open",
+"stack": "( sck mosi miso s -- )",
+"text": "Open SPI s with SCK, MOSI and MISO on the given pins.",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"spi-close",
+"spi-khz",
+"spi-mode",
+"spi-lsb",
+"spi-bits",
+"spi-xfer",
+"spi-write",
+"spi-read"
+],
+"examples": [
+"13 11 12 0 spi-open   \\ SCK D13, MOSI D11, MISO D12",
+"13 11 12 0 spi-open  10 output 10 low   \\ MISO (D12) is not used"
+]
+},
+{
+"name": "spi-close",
+"stack": "( s -- )",
+"text": "Close it; its pins return to their own latch and direction.",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"spi-open",
+"spi-khz",
+"spi-mode",
+"spi-lsb",
+"spi-bits",
+"spi-xfer",
+"spi-write",
+"spi-read"
+],
+"examples": []
+},
+{
+"name": "spi-khz",
+"stack": "( khz s -- )",
+"text": "Clock in kHz, 1..12000; \"bad frequency\" outside. The clock is 24,000 / n kHz for a whole n, the nearest one not above the value: 12000, 8000, 6000, 4800, 4000, …, 1000 (exact), …",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"spi-open",
+"spi-close",
+"spi-mode",
+"spi-lsb",
+"spi-bits",
+"spi-xfer",
+"spi-write",
+"spi-read"
+],
+"examples": [
+"1000 0 spi-khz"
+]
+},
+{
+"name": "spi-mode",
+"stack": "( mode s -- )",
+"text": "Mode 0..3: bit 1 = CPOL (the clock's idle level), bit 0 = CPHA (0: data taken on the first edge, 1: on the second).",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"spi-open",
+"spi-close",
+"spi-khz",
+"spi-lsb",
+"spi-bits",
+"spi-xfer",
+"spi-write",
+"spi-read"
+],
+"examples": []
+},
+{
+"name": "spi-lsb",
+"stack": "( f s -- )",
+"text": "True: least significant bit first.",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"spi-open",
+"spi-close",
+"spi-khz",
+"spi-mode",
+"spi-bits",
+"spi-xfer",
+"spi-write",
+"spi-read"
+],
+"examples": []
+},
+{
+"name": "spi-bits",
+"stack": "( n s -- )",
+"text": "8 or 16 bits per transfer; \"bad bits\" for anything else.",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"spi-open",
+"spi-close",
+"spi-khz",
+"spi-mode",
+"spi-lsb",
+"spi-xfer",
+"spi-write",
+"spi-read"
+],
+"examples": []
+},
+{
+"name": "spi-xfer",
+"stack": "( out s -- in )",
+"text": "Send out and return what came back at the same time (8 or 16 bits).",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"spi-open",
+"spi-close",
+"spi-khz",
+"spi-mode",
+"spi-lsb",
+"spi-bits",
+"spi-write",
+"spi-read"
+],
+"examples": [
+"10 low $9F 0 spi-xfer drop 0 0 spi-xfer . 10 high",
+": >595 ( c -- ) 0 spi-xfer drop 10 high 10 low ;"
+]
+},
+{
+"name": "spi-write",
+"stack": "( a n s -- )",
+"text": "Send n bytes from a; what comes back is dropped.",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"spi-open",
+"spi-close",
+"spi-khz",
+"spi-mode",
+"spi-lsb",
+"spi-bits",
+"spi-xfer",
+"spi-read"
+],
+"examples": []
+},
+{
+"name": "spi-read",
+"stack": "( a n s -- )",
+"text": "Receive n bytes into a, sending zeros.",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"spi-open",
+"spi-close",
+"spi-khz",
+"spi-mode",
+"spi-lsb",
+"spi-bits",
+"spi-xfer",
+"spi-write"
+],
+"examples": []
+},
+{
+"name": "i2c-open",
+"stack": "( khz scl sda -- )",
+"text": "Open with SCL and SDA on the given pins; 100 = standard, 400 = fast mode; the clock is at most the value given. \"bad frequency\" outside 1..1000.",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"i2c-close",
+"i2c!",
+"i2c@",
+"i2c-probe",
+"i2c-scan",
+"i2c-start",
+"i2c-stop",
+"i2c-addr",
+"i2c-write",
+"i2c-read"
+],
+"examples": [
+"100 18 19 i2c-open"
+]
+},
+{
+"name": "i2c-close",
+"stack": "( -- )",
+"text": "Close it; the pins are free again.",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"i2c-open",
+"i2c!",
+"i2c@",
+"i2c-probe",
+"i2c-scan",
+"i2c-start",
+"i2c-stop",
+"i2c-addr",
+"i2c-write",
+"i2c-read"
+],
+"examples": [
+"i2c-close"
+]
+},
+{
+"name": "i2c!",
+"stack": "( b reg addr -- )",
+"text": "Write byte b into register reg of the device at addr.",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"i2c-open",
+"i2c-close",
+"i2c@",
+"i2c-probe",
+"i2c-scan",
+"i2c-start",
+"i2c-stop",
+"i2c-addr",
+"i2c-write",
+"i2c-read"
+],
+"examples": [
+"65 0 $50 i2c!  5 ms   \\ 65 into cell 0; writing takes 5 ms"
+]
+},
+{
+"name": "i2c@",
+"stack": "( reg addr -- b )",
+"text": "Read register reg of the device at addr (a write of reg, a repeated start, a read).",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"i2c-open",
+"i2c-close",
+"i2c!",
+"i2c-probe",
+"i2c-scan",
+"i2c-start",
+"i2c-stop",
+"i2c-addr",
+"i2c-write",
+"i2c-read"
+],
+"examples": [
+"0 $50 i2c@ .   \\ 65"
+]
+},
+{
+"name": "i2c-probe",
+"stack": "( addr -- f )",
+"text": "True if a device acknowledges addr.",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"i2c-open",
+"i2c-close",
+"i2c!",
+"i2c@",
+"i2c-scan",
+"i2c-start",
+"i2c-stop",
+"i2c-addr",
+"i2c-write",
+"i2c-read"
+],
+"examples": []
+},
+{
+"name": "i2c-scan",
+"stack": "( -- )",
+"text": "Print the addresses $08..$77 that answer, in hex.",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"i2c-open",
+"i2c-close",
+"i2c!",
+"i2c@",
+"i2c-probe",
+"i2c-start",
+"i2c-stop",
+"i2c-addr",
+"i2c-write",
+"i2c-read"
+],
+"examples": [
+"i2c-scan   \\ prints 50"
+]
+},
+{
+"name": "i2c-start",
+"stack": "( -- )",
+"text": "A start condition (or a repeated start).",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"i2c-open",
+"i2c-close",
+"i2c!",
+"i2c@",
+"i2c-probe",
+"i2c-scan",
+"i2c-stop",
+"i2c-addr",
+"i2c-write",
+"i2c-read"
+],
+"examples": []
+},
+{
+"name": "i2c-stop",
+"stack": "( -- )",
+"text": "A stop condition.",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"i2c-open",
+"i2c-close",
+"i2c!",
+"i2c@",
+"i2c-probe",
+"i2c-scan",
+"i2c-start",
+"i2c-addr",
+"i2c-write",
+"i2c-read"
+],
+"examples": [
+"$48 1 i2c-addr drop -1 i2c-read 8 lshift 0 i2c-read or i2c-stop ;"
+]
+},
+{
+"name": "i2c-addr",
+"stack": "( addr rw -- ack? )",
+"text": "A start, then the address byte: rw 0 = write, 1 = read. True if the device acknowledged.",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"i2c-open",
+"i2c-close",
+"i2c!",
+"i2c@",
+"i2c-probe",
+"i2c-scan",
+"i2c-start",
+"i2c-stop",
+"i2c-write",
+"i2c-read"
+],
+"examples": [
+"$48 0 i2c-addr drop 0 i2c-write drop",
+"$48 1 i2c-addr drop -1 i2c-read 8 lshift 0 i2c-read or i2c-stop ;"
+]
+},
+{
+"name": "i2c-write",
+"stack": "( b -- ack? )",
+"text": "Send a byte; true if the device acknowledged.",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"i2c-open",
+"i2c-close",
+"i2c!",
+"i2c@",
+"i2c-probe",
+"i2c-scan",
+"i2c-start",
+"i2c-stop",
+"i2c-addr",
+"i2c-read"
+],
+"examples": [
+"$48 0 i2c-addr drop 0 i2c-write drop"
+]
+},
+{
+"name": "i2c-read",
+"stack": "( ack? -- b )",
+"text": "Receive a byte; true: acknowledge it (more will be read), false: it is the last.",
+"section": "5.15 Serial interfaces: UART, SPI, I2C",
+"area": "Serial interfaces: UART, SPI, I2C",
+"related": [
+"i2c-open",
+"i2c-close",
+"i2c!",
+"i2c@",
+"i2c-probe",
+"i2c-scan",
+"i2c-start",
+"i2c-stop",
+"i2c-addr",
+"i2c-write"
+],
+"examples": [
+"$48 1 i2c-addr drop -1 i2c-read 8 lshift 0 i2c-read or i2c-stop ;"
+]
+},
+{
+"name": "accel@",
+"stack": "( -- x y z )",
+"text": "The acceleration on the three axes in mg (thousandths of g). Lying flat, components up, the board reads about 0 0 1000.",
+"section": "5.16 Accelerometer",
+"area": "Accelerometer",
+"related": [
+"accel?",
+"accel-on",
+"acc@",
+"acc!"
+],
+"examples": [
+"accel@ rot . swap . . 0 0 1000  ok   \\ x y z, the board lying flat",
+": tilt begin accel@ rot . swap . . cr 500 ms key? until key drop ;",
+": x-led ( -- n ) accel@ 2drop 1000 + 250 / 0 max 7 min ;"
+]
+},
+{
+"name": "accel?",
+"stack": "( -- f )",
+"text": "True if the accelerometer answers (its WHO_AM_I register reads $33).",
+"section": "5.16 Accelerometer",
+"area": "Accelerometer",
+"related": [
+"accel@",
+"accel-on",
+"acc@",
+"acc!"
+],
+"examples": [
+"accel? . -1  ok"
+]
+},
+{
+"name": "accel-on",
+"stack": "( -- )",
+"text": "Set it up as above: 100 Hz, X/Y/Z on, block data update, high resolution, ±2 g.",
+"section": "5.16 Accelerometer",
+"area": "Accelerometer",
+"related": [
+"accel@",
+"accel?",
+"acc@",
+"acc!"
+],
+"examples": []
+},
+{
+"name": "acc@",
+"stack": "( reg -- c )",
+"text": "Read LIS3DH register reg.",
+"section": "5.16 Accelerometer",
+"area": "Accelerometer",
+"related": [
+"accel@",
+"accel?",
+"accel-on",
+"acc!"
+],
+"examples": []
+},
+{
+"name": "acc!",
+"stack": "( c reg -- )",
+"text": "Write c to LIS3DH register reg.",
+"section": "5.16 Accelerometer",
+"area": "Accelerometer",
+"related": [
+"accel@",
+"accel?",
+"accel-on",
+"acc@"
+],
+"examples": []
+},
+{
+"name": "f-read",
+"stack": "( lo hi -- )",
+"text": "Start reading at the address. Then each 0 spi\"returns the next byte; the read runs on across the whole flash. End it with \"f-end.",
+"section": "5.17 Serial flash",
+"area": "Serial flash",
+"related": [
+"f-end",
+"f-prog",
+"f-erase",
+"f-erase64",
+"flash-id",
+"spi",
+"spi-cs",
+"f-cmd",
+"f-adr",
+"f-wren",
+"f-wait",
+"crc-reset"
+],
+"examples": [
+": f@ ( lo hi -- x ) f-read 0 spi 0 spi f-end 8 lshift or ;  ok",
+": f@ ( lo hi -- x ) f-read 0 spi 0 spi f-end 8 lshift or ;",
+": fdump ( lo hi -- ) f-read 16 0 do 0 spi . loop f-end ;"
+]
+},
+{
+"name": "f-end",
+"stack": "( -- )",
+"text": "Deselect the flash (and the accelerometer): ends a read or a command.",
+"section": "5.17 Serial flash",
+"area": "Serial flash",
+"related": [
+"f-read",
+"f-prog",
+"f-erase",
+"f-erase64",
+"flash-id",
+"spi",
+"spi-cs",
+"f-cmd",
+"f-adr",
+"f-wren",
+"f-wait",
+"crc-reset"
+],
+"examples": [
+": f@ ( lo hi -- x ) f-read 0 spi 0 spi f-end 8 lshift or ;  ok",
+": f@ ( lo hi -- x ) f-read 0 spi 0 spi f-end 8 lshift or ;",
+": fdump ( lo hi -- ) f-read 16 0 do 0 spi . loop f-end ;"
+]
+},
+{
+"name": "f-prog",
+"stack": "( a n lo hi -- )",
+"text": "Program n bytes from RAM address a into the flash. They must stay within one 256-byte page (lo's low byte + n ≤ 256), and the area must be erased. Waits until done.",
+"section": "5.17 Serial flash",
+"area": "Serial flash",
+"related": [
+"f-read",
+"f-end",
+"f-erase",
+"f-erase64",
+"flash-id",
+"spi",
+"spi-cs",
+"f-cmd",
+"f-adr",
+"f-wren",
+"f-wait",
+"crc-reset"
+],
+"examples": [
+"0 $10 f-erase  v 2 0 $10 f-prog  ok   \\ 2 bytes to $100000",
+"samples 128 0 $10 f-prog   \\ program 128 bytes (within one page)"
+]
+},
+{
+"name": "f-erase",
+"stack": "( lo hi -- )",
+"text": "Erase the 4 KB sector that holds the address (all bytes become $FF). Waits until done.",
+"section": "5.17 Serial flash",
+"area": "Serial flash",
+"related": [
+"f-read",
+"f-end",
+"f-prog",
+"f-erase64",
+"flash-id",
+"spi",
+"spi-cs",
+"f-cmd",
+"f-adr",
+"f-wren",
+"f-wait",
+"crc-reset"
+],
+"examples": [
+"0 $10 f-erase  v 2 0 $10 f-prog  ok   \\ 2 bytes to $100000",
+"0 $10 f-erase   \\ erase the 4 KB sector at $100000"
+]
+},
+{
+"name": "f-erase64",
+"stack": "( lo hi -- )",
+"text": "Erase the 64 KB block that holds the address. Waits until done.",
+"section": "5.17 Serial flash",
+"area": "Serial flash",
+"related": [
+"f-read",
+"f-end",
+"f-prog",
+"f-erase",
+"flash-id",
+"spi",
+"spi-cs",
+"f-cmd",
+"f-adr",
+"f-wren",
+"f-wait",
+"crc-reset"
+],
+"examples": []
+},
+{
+"name": "flash-id",
+"stack": "( -- mfr type size )",
+"text": "The JEDEC ID: $EF $40 $17 for the W25Q64.",
+"section": "5.17 Serial flash",
+"area": "Serial flash",
+"related": [
+"f-read",
+"f-end",
+"f-prog",
+"f-erase",
+"f-erase64",
+"spi",
+"spi-cs",
+"f-cmd",
+"f-adr",
+"f-wren",
+"f-wait",
+"crc-reset"
+],
+"examples": [
+"hex flash-id . . . decimal 17 40 EF  ok"
+]
+},
+{
+"name": "spi",
+"stack": "( c -- c' )",
+"text": "Exchange one byte with the selected device: send c, return the byte received.",
+"section": "5.17 Serial flash",
+"area": "Serial flash",
+"related": [
+"f-read",
+"f-end",
+"f-prog",
+"f-erase",
+"f-erase64",
+"flash-id",
+"spi-cs",
+"f-cmd",
+"f-adr",
+"f-wren",
+"f-wait",
+"crc-reset"
+],
+"examples": [
+": f@ ( lo hi -- x ) f-read 0 spi 0 spi f-end 8 lshift or ;  ok",
+": f@ ( lo hi -- x ) f-read 0 spi 0 spi f-end 8 lshift or ;",
+": fdump ( lo hi -- ) f-read 16 0 do 0 spi . loop f-end ;"
+]
+},
+{
+"name": "spi-cs",
+"stack": "( f -- )",
+"text": "Select the flash if bit 0 of f is set, else deselect it.",
+"section": "5.17 Serial flash",
+"area": "Serial flash",
+"related": [
+"f-read",
+"f-end",
+"f-prog",
+"f-erase",
+"f-erase64",
+"flash-id",
+"spi",
+"f-cmd",
+"f-adr",
+"f-wren",
+"f-wait",
+"crc-reset"
+],
+"examples": []
+},
+{
+"name": "f-cmd",
+"stack": "( c -- )",
+"text": "Select the flash and send the command byte c.",
+"section": "5.17 Serial flash",
+"area": "Serial flash",
+"related": [
+"f-read",
+"f-end",
+"f-prog",
+"f-erase",
+"f-erase64",
+"flash-id",
+"spi",
+"spi-cs",
+"f-adr",
+"f-wren",
+"f-wait",
+"crc-reset"
+],
+"examples": []
+},
+{
+"name": "f-adr",
+"stack": "( lo hi -- )",
+"text": "Send a 24-bit address, high byte first.",
+"section": "5.17 Serial flash",
+"area": "Serial flash",
+"related": [
+"f-read",
+"f-end",
+"f-prog",
+"f-erase",
+"f-erase64",
+"flash-id",
+"spi",
+"spi-cs",
+"f-cmd",
+"f-wren",
+"f-wait",
+"crc-reset"
+],
+"examples": []
+},
+{
+"name": "f-wren",
+"stack": "( -- )",
+"text": "Send *write enable* (needed before every program or erase command).",
+"section": "5.17 Serial flash",
+"area": "Serial flash",
+"related": [
+"f-read",
+"f-end",
+"f-prog",
+"f-erase",
+"f-erase64",
+"flash-id",
+"spi",
+"spi-cs",
+"f-cmd",
+"f-adr",
+"f-wait",
+"crc-reset"
+],
+"examples": []
+},
+{
+"name": "f-wait",
+"stack": "( -- )",
+"text": "Wait until the flash has finished programming or erasing.",
+"section": "5.17 Serial flash",
+"area": "Serial flash",
+"related": [
+"f-read",
+"f-end",
+"f-prog",
+"f-erase",
+"f-erase64",
+"flash-id",
+"spi",
+"spi-cs",
+"f-cmd",
+"f-adr",
+"f-wren",
+"crc-reset"
+],
+"examples": []
+},
+{
+"name": "crc-reset",
+"stack": "( -- )",
+"text": "Start a new CRC-32.",
+"section": "5.17 Serial flash",
+"area": "Serial flash",
+"related": [
+"f-read",
+"f-end",
+"f-prog",
+"f-erase",
+"f-erase64",
+"flash-id",
+"spi",
+"spi-cs",
+"f-cmd",
+"f-adr",
+"f-wren",
+"f-wait"
+],
+"examples": [
+": crc-test crc-reset 58 49 do i crc+ loop crc@ ;  ok   \\ the bytes \"123456789\""
+]
+},
+{
+"name": "crc+",
+"stack": "( c -- )",
+"text": "Add a byte to the CRC.",
+"section": "5.17 Serial flash",
+"area": "Serial flash",
+"related": [
+"f-read",
+"f-end",
+"f-prog",
+"f-erase",
+"f-erase64",
+"flash-id",
+"spi",
+"spi-cs",
+"f-cmd",
+"f-adr",
+"f-wren",
+"f-wait"
+],
+"examples": [
+": crc-test crc-reset 58 49 do i crc+ loop crc@ ;  ok   \\ the bytes \"123456789\""
+]
+},
+{
+"name": "crc@",
+"stack": "( -- lo hi )",
+"text": "The CRC-32 so far, as two cells. It is the standard CRC-32 (as zlib computes it).",
+"section": "5.17 Serial flash",
+"area": "Serial flash",
+"related": [
+"f-read",
+"f-end",
+"f-prog",
+"f-erase",
+"f-erase64",
+"flash-id",
+"spi",
+"spi-cs",
+"f-cmd",
+"f-adr",
+"f-wren",
+"f-wait"
+],
+"examples": [
+": crc-test crc-reset 58 49 do i crc+ loop crc@ ;  ok   \\ the bytes \"123456789\""
+]
+},
+{
+"name": ".source",
+"stack": "( -- )",
+"text": "List the saved source.",
+"section": "5.18 Saved source",
+"area": "Saved source",
+"related": [
+"load-source",
+"autostart",
+"erase-source",
+"source?",
+"store"
+],
+"examples": [
+".source \\ Bench demo for the wired test environment: potentiometer on AIN3, button on"
+]
+},
+{
+"name": "load-source",
+"stack": "( -- )",
+"text": "Run the saved source now, after the rest of the current line.",
+"section": "5.18 Saved source",
+"area": "Saved source",
+"related": [
+".source",
+"autostart",
+"erase-source",
+"source?",
+"store"
+],
+"examples": []
+},
+{
+"name": "autostart",
+"stack": "( f -- )",
+"text": "Switch the autostart on (true) or off (false). \"no saved source\" if there is no valid source.",
+"section": "5.18 Saved source",
+"area": "Saved source",
+"related": [
+".source",
+"load-source",
+"erase-source",
+"source?",
+"store"
+],
+"examples": [
+"0 autostart  ok"
+]
+},
+{
+"name": "erase-source",
+"stack": "( -- )",
+"text": "Delete the saved source (its header).",
+"section": "5.18 Saved source",
+"area": "Saved source",
+"related": [
+".source",
+"load-source",
+"autostart",
+"source?",
+"store"
+],
+"examples": []
+},
+{
+"name": "source?",
+"stack": "( -- len | 0 )",
+"text": "The length of the saved source if its header and CRC are right, else 0.",
+"section": "5.18 Saved source",
+"area": "Saved source",
+"related": [
+".source",
+"load-source",
+"autostart",
+"erase-source",
+"store"
+],
+"examples": [
+"source? . 711  ok   \\ for example"
+]
+},
+{
+"name": "store",
+"stack": "( len flags -- )",
+"text": "Receive and save a source: prints \"ready\", then reads len raw bytes from the serial port and stores them with the flags (bit 0 = autostart). Prints \"stored n bytes\", \"store timeout\" (2 s without a byte) or \"store failed\". Used by mforth.py --store.",
+"section": "5.18 Saved source",
+"area": "Saved source",
+"related": [
+".source",
+"load-source",
+"autostart",
+"erase-source",
+"source?"
+],
+"examples": []
+},
+{
+"name": ":",
+"stack": "( -- )",
+"text": "Start a new definition called name and switch to compiling.",
+"section": "5.19 Defining words",
+"area": "Defining words",
+"related": [
+";",
+"variable",
+"constant",
+"create",
+"buffer:",
+"immediate"
+],
+"examples": [
+": hello .\" Hello, MAX1000!\" cr ;",
+": blink3 10 0 do 3 led-toggle 200 ms loop ;",
+": rd16 ( -- n )"
+]
+},
+{
+"name": ";",
+"stack": "( -- )",
+"text": "End the definition, make it findable, switch back to interpreting.",
+"section": "5.19 Defining words",
+"area": "Defining words",
+"related": [
+":",
+"variable",
+"constant",
+"create",
+"buffer:",
+"immediate"
+],
+"examples": [
+": hello .\" Hello, MAX1000!\" cr ;",
+": blink3 10 0 do 3 led-toggle 200 ms loop ;",
+"$48 1 i2c-addr drop -1 i2c-read 8 lshift 0 i2c-read or i2c-stop ;"
+]
+},
+{
+"name": "variable",
+"stack": "( -- )",
+"text": "Create a variable (one cell, initially 0). name then pushes its address.",
+"section": "5.19 Defining words",
+"area": "Defining words",
+"related": [
+":",
+";",
+"constant",
+"create",
+"buffer:",
+"immediate"
+],
+"examples": [
+"variable x  5 x !  3 x +!  x ? 8  ok",
+"variable v  4711 v !  ok",
+"variable count"
+]
+},
+{
+"name": "constant",
+"stack": "( n -- )",
+"text": "Create a constant. name then pushes n.",
+"section": "5.19 Defining words",
+"area": "Defining words",
+"related": [
+":",
+";",
+"variable",
+"create",
+"buffer:",
+"immediate"
+],
+"examples": [
+"10 constant ten"
+]
+},
+{
+"name": "create",
+"stack": "( -- )",
+"text": "Create a word that pushes the address of the data space following it; reserve that space with allot, ,\"or \"c,.",
+"section": "5.19 Defining words",
+"area": "Defining words",
+"related": [
+":",
+";",
+"variable",
+"constant",
+"buffer:",
+"immediate"
+],
+"examples": [
+"create table 1 , 2 , 4 , 8 ,",
+"create buffer 20 allot"
+]
+},
+{
+"name": "immediate",
+"stack": "( -- )",
+"text": "Make the newest word immediate: it runs during compilation instead of being compiled.",
+"section": "5.19 Defining words",
+"area": "Defining words",
+"related": [
+":",
+";",
+"variable",
+"constant",
+"create",
+"buffer:"
+],
+"examples": [
+": shout .\" loud\" ; immediate"
+]
+},
+{
+"name": "if",
+"stack": "f if ... then",
+"text": "Run the code if f is true.",
+"section": "5.20 Control structures",
+"area": "Control structures",
+"related": [
+"then",
+"else",
+"then",
+"begin",
+"until",
+"begin",
+"while",
+"repeat",
+"begin",
+"again",
+"do",
+"loop"
+],
+"examples": [
+"0 uart-key? .   \\ -1 if something came back",
+": fact ( n -- n! ) dup 1 > if dup 1- recurse * then ;",
+": find3 10 0 do i 3 = if .\" found\" unloop exit then loop .\" none\" ;"
+]
+},
+{
+"name": "then",
+"stack": "f if ... then",
+"text": "Run the code if f is true.",
+"section": "5.20 Control structures",
+"area": "Control structures",
+"related": [
+"if",
+"if",
+"else",
+"begin",
+"until",
+"begin",
+"while",
+"repeat",
+"begin",
+"again",
+"do",
+"loop"
+],
+"examples": [
+": fact ( n -- n! ) dup 1 > if dup 1- recurse * then ;",
+": find3 10 0 do i 3 = if .\" found\" unloop exit then loop .\" none\" ;",
+"begin btn@ if count-press then key? until key drop"
+]
+},
+{
+"name": "else",
+"stack": "f if ... else ... then",
+"text": "Choose between two branches.",
+"section": "5.20 Control structures",
+"area": "Control structures",
+"related": [
+"if",
+"then",
+"if",
+"then",
+"begin",
+"until",
+"begin",
+"while",
+"repeat",
+"begin",
+"again",
+"do"
+],
+"examples": [
+": up? accel@ nip nip 0> if .\" face up\" else .\" face down\" then cr ;"
+]
+},
+{
+"name": "begin",
+"stack": "begin ... f until",
+"text": "Repeat until f is true (runs at least once).",
+"section": "5.20 Control structures",
+"area": "Control structures",
+"related": [
+"if",
+"then",
+"if",
+"else",
+"then",
+"until",
+"while",
+"repeat",
+"again",
+"do",
+"loop",
+"do"
+],
+"examples": [
+": runner begin 8 0 do 1 i lshift led! 100 ms loop key? until key drop 0 led! ;",
+"begin 1 led-toggle 2 led-toggle 250 ms key? until key drop 0 led! ;",
+": mirror begin btn@ led! key? until key drop 0 led! ;"
+]
+},
+{
+"name": "until",
+"stack": "begin ... f until",
+"text": "Repeat until f is true (runs at least once).",
+"section": "5.20 Control structures",
+"area": "Control structures",
+"related": [
+"if",
+"then",
+"if",
+"else",
+"then",
+"begin",
+"begin",
+"while",
+"repeat",
+"begin",
+"again",
+"do"
+],
+"examples": [
+": runner begin 8 0 do 1 i lshift led! 100 ms loop key? until key drop 0 led! ;",
+"begin 1 led-toggle 2 led-toggle 250 ms key? until key drop 0 led! ;",
+": mirror begin btn@ led! key? until key drop 0 led! ;"
+]
+},
+{
+"name": "while",
+"stack": "begin ... f while ... repeat",
+"text": "Repeat while f is true, test in the middle.",
+"section": "5.20 Control structures",
+"area": "Control structures",
+"related": [
+"if",
+"then",
+"if",
+"else",
+"then",
+"begin",
+"until",
+"begin",
+"repeat",
+"begin",
+"again",
+"do"
+],
+"examples": [
+"btn@ .   \\ hold the USER button while pressing Enter: prints -1",
+": quiet shout ; loud ok   \\ shout ran while quiet was compiled",
+": show ( -- ) begin 0 uart-key? while 0 uart-key emit repeat ;"
+]
+},
+{
+"name": "repeat",
+"stack": "begin ... f while ... repeat",
+"text": "Repeat while f is true, test in the middle.",
+"section": "5.20 Control structures",
+"area": "Control structures",
+"related": [
+"if",
+"then",
+"if",
+"else",
+"then",
+"begin",
+"until",
+"begin",
+"while",
+"begin",
+"again",
+"do"
+],
+"examples": [
+": show ( -- ) begin 0 uart-key? while 0 uart-key emit repeat ;"
+]
+},
+{
+"name": "again",
+"stack": "begin ... again",
+"text": "Repeat forever (leave with exit, or Ctrl-R from the terminal).",
+"section": "5.20 Control structures",
+"area": "Control structures",
+"related": [
+"if",
+"then",
+"if",
+"else",
+"then",
+"begin",
+"until",
+"begin",
+"while",
+"repeat",
+"begin",
+"do"
+],
+"examples": [
+"again ;"
+]
+},
+{
+"name": "do",
+"stack": "limit start do ... loop",
+"text": "Counted loop: the index runs from start to limit − 1.",
+"section": "5.20 Control structures",
+"area": "Control structures",
+"related": [
+"if",
+"then",
+"if",
+"else",
+"then",
+"begin",
+"until",
+"begin",
+"while",
+"repeat",
+"begin",
+"again"
+],
+"examples": [
+": blink3 10 0 do 3 led-toggle 200 ms loop ;",
+": crc-test crc-reset 58 49 do i crc+ loop crc@ ;  ok   \\ the bytes \"123456789\"",
+": evens 10 0 do i . 2 +loop ;"
+]
+},
+{
+"name": "loop",
+"stack": "limit start do ... loop",
+"text": "Counted loop: the index runs from start to limit − 1.",
+"section": "5.20 Control structures",
+"area": "Control structures",
+"related": [
+"if",
+"then",
+"if",
+"else",
+"then",
+"begin",
+"until",
+"begin",
+"while",
+"repeat",
+"begin",
+"again"
+],
+"examples": [
+": blink3 10 0 do 3 led-toggle 200 ms loop ;",
+": crc-test crc-reset 58 49 do i crc+ loop crc@ ;  ok   \\ the bytes \"123456789\"",
+": table 3 1 do 3 1 do j i * . loop loop ;"
+]
+},
+{
+"name": "+loop",
+"stack": "limit start do ... n +loop",
+"text": "Like loop, but adds n to the index; ends when the index is ≥ limit. Counts upward only.",
+"section": "5.20 Control structures",
+"area": "Control structures",
+"related": [
+"if",
+"then",
+"if",
+"else",
+"then",
+"begin",
+"until",
+"begin",
+"while",
+"repeat",
+"begin",
+"again"
+],
+"examples": [
+": evens 10 0 do i . 2 +loop ;"
+]
+},
+{
+"name": "exit",
+"stack": "exit",
+"text": "Return from the current word immediately.",
+"section": "5.20 Control structures",
+"area": "Control structures",
+"related": [
+"if",
+"then",
+"if",
+"else",
+"then",
+"begin",
+"until",
+"begin",
+"while",
+"repeat",
+"begin",
+"again"
+],
+"examples": [
+": find3 10 0 do i 3 = if .\" found\" unloop exit then loop .\" none\" ;",
+"key? if key dup 27 = if drop exit then 0 uart-emit then"
+]
+},
+{
+"name": "recurse",
+"stack": "recurse",
+"text": "Call the word being defined.",
+"section": "5.20 Control structures",
+"area": "Control structures",
+"related": [
+"if",
+"then",
+"if",
+"else",
+"then",
+"begin",
+"until",
+"begin",
+"while",
+"repeat",
+"begin",
+"again"
+],
+"examples": [
+": fact ( n -- n! ) dup 1 > if dup 1- recurse * then ;"
+]
+},
+{
+"name": "i",
+"stack": "( -- n )",
+"text": "Index of the innermost loop.",
+"section": "5.20 Control structures",
+"area": "Control structures",
+"related": [
+"j",
+"unloop"
+],
+"examples": [
+": crc-test crc-reset 58 49 do i crc+ loop crc@ ;  ok   \\ the bytes \"123456789\"",
+": evens 10 0 do i . 2 +loop ;",
+": table 3 1 do 3 1 do j i * . loop loop ;"
+]
+},
+{
+"name": "j",
+"stack": "( -- n )",
+"text": "Index of the next outer loop (in the same definition).",
+"section": "5.20 Control structures",
+"area": "Control structures",
+"related": [
+"i",
+"unloop"
+],
+"examples": [
+": table 3 1 do 3 1 do j i * . loop loop ;"
+]
+},
+{
+"name": "unloop",
+"stack": "( -- )",
+"text": "Remove the loop parameters from the return stack. Required before exit inside a loop.",
+"section": "5.20 Control structures",
+"area": "Control structures",
+"related": [
+"i",
+"j"
+],
+"examples": [
+": find3 10 0 do i 3 = if .\" found\" unloop exit then loop .\" none\" ;"
+]
+},
+{
+"name": "'",
+"stack": "( -- xt | 0 )",
+"text": "Execution token of name; 0 if not found (standard Forth signals an error).",
+"section": "5.21 Compiler and execution",
+"area": "Compiler and execution",
+"related": [
+"[']",
+"execute",
+"[",
+"]",
+"literal",
+"compile,",
+"state"
+],
+"examples": [
+"' five execute . 5  ok"
+]
+},
+{
+"name": "[']",
+"stack": "( -- )",
+"text": "Compile only: compile name's xt as a literal.",
+"section": "5.21 Compiler and execution",
+"area": "Compiler and execution",
+"related": [
+"'",
+"execute",
+"[",
+"]",
+"literal",
+"compile,",
+"state"
+],
+"examples": []
+},
+{
+"name": "execute",
+"stack": "( xt -- )",
+"text": "Run the word with this execution token. 0 execute\"runs \"cold (section 4.6).",
+"section": "5.21 Compiler and execution",
+"area": "Compiler and execution",
+"related": [
+"'",
+"[']",
+"[",
+"]",
+"literal",
+"compile,",
+"state"
+],
+"examples": [
+"' five execute . 5  ok"
+]
+},
+{
+"name": "[",
+"stack": "( -- )",
+"text": "Switch to interpreting inside a definition (immediate).",
+"section": "5.21 Compiler and execution",
+"area": "Compiler and execution",
+"related": [
+"'",
+"[']",
+"execute",
+"]",
+"literal",
+"compile,",
+"state"
+],
+"examples": [
+": five [ 2 3 + ] literal ;  ok"
+]
+},
+{
+"name": "]",
+"stack": "( -- )",
+"text": "Switch back to compiling.",
+"section": "5.21 Compiler and execution",
+"area": "Compiler and execution",
+"related": [
+"'",
+"[']",
+"execute",
+"[",
+"literal",
+"compile,",
+"state"
+],
+"examples": [
+": five [ 2 3 + ] literal ;  ok"
+]
+},
+{
+"name": "literal",
+"stack": "( n -- )",
+"text": "Compile n as a number (immediate). Use it with [\"and \"] to compute values at compile time.",
+"section": "5.21 Compiler and execution",
+"area": "Compiler and execution",
+"related": [
+"'",
+"[']",
+"execute",
+"[",
+"]",
+"compile,",
+"state"
+],
+"examples": [
+": five [ 2 3 + ] literal ;  ok"
+]
+},
+{
+"name": "compile,",
+"stack": "( xt -- )",
+"text": "Compile a call to xt.",
+"section": "5.21 Compiler and execution",
+"area": "Compiler and execution",
+"related": [
+"'",
+"[']",
+"execute",
+"[",
+"]",
+"literal",
+"state"
+],
+"examples": []
+},
+{
+"name": "state",
+"stack": "( -- a )",
+"text": "Variable: −1 while compiling, 0 while interpreting.",
+"section": "5.21 Compiler and execution",
+"area": "Compiler and execution",
+"related": [
+"'",
+"[']",
+"execute",
+"[",
+"]",
+"literal",
+"compile,"
+],
+"examples": []
+},
+{
+"name": "(",
+"stack": "",
+"text": "Ignore everything up to the closing ). Commonly used for stack comments.",
+"section": "5.22 Comments",
+"area": "Comments",
+"related": [
+"\\"
+],
+"examples": [
+": rd16 ( -- n )",
+": f@ ( lo hi -- x ) f-read 0 spi 0 spi f-end 8 lshift or ;  ok",
+": fact ( n -- n! ) dup 1 > if dup 1- recurse * then ;"
+]
+},
+{
+"name": "\\",
+"stack": "",
+"text": "Ignore the rest of the line.",
+"section": "5.22 Comments",
+"area": "Comments",
+"related": [
+"("
+],
+"examples": [
+"$81 led!   \\ LED1 and LED8 on, all others off",
+"3 led-on   \\ LED3 on as well: LED1, LED3 and LED8 are lit",
+"1 led-off   \\ LED1 off: LED3 and LED8 stay on"
+]
+},
+{
+"name": "words",
+"stack": "( -- )",
+"text": "List all words, newest first (internal words included).",
+"section": "5.23 Interpreter and system",
+"area": "Interpreter and system",
+"related": [
+"quit",
+"abort",
+"cold"
+],
+"examples": []
+},
+{
+"name": "quit",
+"stack": "( -- )",
+"text": "Return to the interpreter loop (the data stack is kept).",
+"section": "5.23 Interpreter and system",
+"area": "Interpreter and system",
+"related": [
+"words",
+"abort",
+"cold"
+],
+"examples": []
+},
+{
+"name": "abort",
+"stack": "( -- )",
+"text": "Clear the data stack and return to the interpreter loop; stops a running saved source.",
+"section": "5.23 Interpreter and system",
+"area": "Interpreter and system",
+"related": [
+"words",
+"quit",
+"cold"
+],
+"examples": []
+},
+{
+"name": "cold",
+"stack": "( -- )",
+"text": "Restart in software: the kernel's dictionary, PWM, DDS and serial interfaces off, decimal base, banner, LED1 on, the saved source if autostart is on, interpreter loop. Pins keep their state (section 4.6).",
+"section": "5.23 Interpreter and system",
+"area": "Interpreter and system",
+"related": [
+"words",
+"quit",
+"abort"
+],
+"examples": []
+},
+{
+"name": "dp",
+"stack": "",
+"text": "Dictionary pointer: the value here returns.",
+"section": "5.24 Variables and constants used by the system",
+"area": "Variables and constants used by the system",
+"related": [
+"latest",
+"dp0",
+"latest0",
+"dp2",
+"data0",
+"data-end",
+"state",
+"base",
+"tib",
+"#tib",
+">in",
+"'a"
+],
+"examples": []
+},
+{
+"name": "latest",
+"stack": "",
+"text": "Header address of the newest word.",
+"section": "5.24 Variables and constants used by the system",
+"area": "Variables and constants used by the system",
+"related": [
+"dp",
+"dp0",
+"latest0",
+"dp2",
+"data0",
+"data-end",
+"state",
+"base",
+"tib",
+"#tib",
+">in",
+"'a"
+],
+"examples": []
+},
+{
+"name": "dp0",
+"stack": "",
+"text": "dp\"and \"latest\"of the fresh kernel; \"cold restores them.",
+"section": "5.24 Variables and constants used by the system",
+"area": "Variables and constants used by the system",
+"related": [
+"dp",
+"latest",
+"latest0",
+"dp2",
+"data0",
+"data-end",
+"state",
+"base",
+"tib",
+"#tib",
+">in",
+"'a"
+],
+"examples": []
+},
+{
+"name": "latest0",
+"stack": "",
+"text": "dp\"and \"latest\"of the fresh kernel; \"cold restores them.",
+"section": "5.24 Variables and constants used by the system",
+"area": "Variables and constants used by the system",
+"related": [
+"dp",
+"latest",
+"dp0",
+"dp2",
+"data0",
+"data-end",
+"state",
+"base",
+"tib",
+"#tib",
+">in",
+"'a"
+],
+"examples": []
+},
+{
+"name": "dp2",
+"stack": "",
+"text": "Next free byte of the data RAM (buffer:).",
+"section": "5.24 Variables and constants used by the system",
+"area": "Variables and constants used by the system",
+"related": [
+"dp",
+"latest",
+"dp0",
+"latest0",
+"data0",
+"data-end",
+"state",
+"base",
+"tib",
+"#tib",
+">in",
+"'a"
+],
+"examples": []
+},
+{
+"name": "data0",
+"stack": "",
+"text": "Constants: $4000\"and \"$5C00, the data RAM buffer: hands out.",
+"section": "5.24 Variables and constants used by the system",
+"area": "Variables and constants used by the system",
+"related": [
+"dp",
+"latest",
+"dp0",
+"latest0",
+"dp2",
+"data-end",
+"state",
+"base",
+"tib",
+"#tib",
+">in",
+"'a"
+],
+"examples": []
+},
+{
+"name": "data-end",
+"stack": "",
+"text": "Constants: $4000\"and \"$5C00, the data RAM buffer: hands out.",
+"section": "5.24 Variables and constants used by the system",
+"area": "Variables and constants used by the system",
+"related": [
+"dp",
+"latest",
+"dp0",
+"latest0",
+"dp2",
+"data0",
+"state",
+"base",
+"tib",
+"#tib",
+">in",
+"'a"
+],
+"examples": []
+},
+{
+"name": "tib",
+"stack": "",
+"text": "Constant: the terminal input buffer, $5D00 (82 bytes).",
+"section": "5.24 Variables and constants used by the system",
+"area": "Variables and constants used by the system",
+"related": [
+"dp",
+"latest",
+"dp0",
+"latest0",
+"dp2",
+"data0",
+"data-end",
+"state",
+"base",
+"#tib",
+">in",
+"'a"
+],
+"examples": []
+},
+{
+"name": "#tib",
+"stack": "",
+"text": "Number of characters in the current input line.",
+"section": "5.24 Variables and constants used by the system",
+"area": "Variables and constants used by the system",
+"related": [
+"dp",
+"latest",
+"dp0",
+"latest0",
+"dp2",
+"data0",
+"data-end",
+"state",
+"base",
+"tib",
+">in",
+"'a"
+],
+"examples": []
+},
+{
+"name": ">in",
+"stack": "",
+"text": "Parse position in tib.",
+"section": "5.24 Variables and constants used by the system",
+"area": "Variables and constants used by the system",
+"related": [
+"dp",
+"latest",
+"dp0",
+"latest0",
+"dp2",
+"data0",
+"data-end",
+"state",
+"base",
+"tib",
+"#tib",
+"'a"
+],
+"examples": []
+},
+{
+"name": "'a",
+"stack": "",
+"text": "Address and length of the name being searched by find-name.",
+"section": "5.24 Variables and constants used by the system",
+"area": "Variables and constants used by the system",
+"related": [
+"dp",
+"latest",
+"dp0",
+"latest0",
+"dp2",
+"data0",
+"data-end",
+"state",
+"base",
+"tib",
+"#tib",
+">in"
+],
+"examples": []
+},
+{
+"name": "'n",
+"stack": "",
+"text": "Address and length of the name being searched by find-name.",
+"section": "5.24 Variables and constants used by the system",
+"area": "Variables and constants used by the system",
+"related": [
+"dp",
+"latest",
+"dp0",
+"latest0",
+"dp2",
+"data0",
+"data-end",
+"state",
+"base",
+"tib",
+"#tib",
+">in"
+],
+"examples": []
+},
+{
+"name": "sbuf",
+"stack": "",
+"text": "Buffer and count used by .s.",
+"section": "5.24 Variables and constants used by the system",
+"area": "Variables and constants used by the system",
+"related": [
+"dp",
+"latest",
+"dp0",
+"latest0",
+"dp2",
+"data0",
+"data-end",
+"state",
+"base",
+"tib",
+"#tib",
+">in"
+],
+"examples": []
+},
+{
+"name": "sn",
+"stack": "",
+"text": "Buffer and count used by .s.",
+"section": "5.24 Variables and constants used by the system",
+"area": "Variables and constants used by the system",
+"related": [
+"dp",
+"latest",
+"dp0",
+"latest0",
+"dp2",
+"data0",
+"data-end",
+"state",
+"base",
+"tib",
+"#tib",
+">in"
+],
+"examples": []
+},
+{
+"name": "ssnap",
+"stack": "",
+"text": "The copy of the data stack snap\"makes before each line (20 cells, bottom first) and its depth, −1 while copying; the \"stack request sends them.",
+"section": "5.24 Variables and constants used by the system",
+"area": "Variables and constants used by the system",
+"related": [
+"dp",
+"latest",
+"dp0",
+"latest0",
+"dp2",
+"data0",
+"data-end",
+"state",
+"base",
+"tib",
+"#tib",
+">in"
+],
+"examples": []
+},
+{
+"name": "sdepth",
+"stack": "",
+"text": "The copy of the data stack snap\"makes before each line (20 cells, bottom first) and its depth, −1 while copying; the \"stack request sends them.",
+"section": "5.24 Variables and constants used by the system",
+"area": "Variables and constants used by the system",
+"related": [
+"dp",
+"latest",
+"dp0",
+"latest0",
+"dp2",
+"data0",
+"data-end",
+"state",
+"base",
+"tib",
+"#tib",
+">in"
+],
+"examples": []
+},
+{
+"name": "starts",
+"stack": "",
+"text": "Starts since the configuration was loaded (the app's status line shows it).",
+"section": "5.24 Variables and constants used by the system",
+"area": "Variables and constants used by the system",
+"related": [
+"dp",
+"latest",
+"dp0",
+"latest0",
+"dp2",
+"data0",
+"data-end",
+"state",
+"base",
+"tib",
+"#tib",
+">in"
+],
+"examples": []
+},
+{
+"name": "last-start",
+"stack": "",
+"text": "0: no saved source ran at the last start, 1: it ran, 2: it was skipped.",
+"section": "5.24 Variables and constants used by the system",
+"area": "Variables and constants used by the system",
+"related": [
+"dp",
+"latest",
+"dp0",
+"latest0",
+"dp2",
+"data0",
+"data-end",
+"state",
+"base",
+"tib",
+"#tib",
+">in"
+],
+"examples": []
+},
+{
+"name": "kcheck",
+"stack": "",
+"text": "The sum of the kernel image's cells, set by the cross-compiler (part of the version answer).",
+"section": "5.24 Variables and constants used by the system",
+"area": "Variables and constants used by the system",
+"related": [
+"dp",
+"latest",
+"dp0",
+"latest0",
+"dp2",
+"data0",
+"data-end",
+"state",
+"base",
+"tib",
+"#tib",
+">in"
+],
+"examples": []
+},
+{
+"name": "(loop)",
+"stack": "( -- done? )",
+"text": "Increment the loop index; true when it reached the limit.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"(+loop)",
+"(.\")",
+"(s\")",
+"(u.)",
+"digit"
+],
+"examples": []
+},
+{
+"name": "(+loop)",
+"stack": "( n -- done? )",
+"text": "Add n to the loop index; true when it is ≥ the limit.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"(loop)",
+"(.\")",
+"(s\")",
+"(u.)",
+"digit"
+],
+"examples": []
+},
+{
+"name": "(.\")",
+"stack": "( -- )",
+"text": "Print the counted string stored after the call and continue behind it.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"(loop)",
+"(+loop)",
+"(s\")",
+"(u.)",
+"digit"
+],
+"examples": []
+},
+{
+"name": "(s\")",
+"stack": "( -- a n )",
+"text": "Push the counted string stored after the call (used by the kernel's own s\" strings, which only the cross-compiler understands).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"(loop)",
+"(+loop)",
+"(.\")",
+"(u.)",
+"digit"
+],
+"examples": []
+},
+{
+"name": "(u.)",
+"stack": "( u -- )",
+"text": "Print u without a trailing space.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"(loop)",
+"(+loop)",
+"(.\")",
+"(s\")",
+"digit"
+],
+"examples": []
+},
+{
+"name": "digit",
+"stack": "( u -- c )",
+"text": "Convert 0..35 to the character 0..9, A..Z.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"(loop)",
+"(+loop)",
+"(.\")",
+"(s\")",
+"(u.)"
+],
+"examples": []
+},
+{
+"name": "parse-name",
+"stack": "( -- a n )",
+"text": "Skip spaces, return the next space-delimited word (n = 0 at end of line).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"parse",
+"more?",
+"in-char",
+"/string",
+"upper"
+],
+"examples": []
+},
+{
+"name": "parse",
+"stack": "( c -- a n )",
+"text": "Return the text up to character c and skip past c.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"parse-name",
+"more?",
+"in-char",
+"/string",
+"upper"
+],
+"examples": []
+},
+{
+"name": "more?",
+"stack": "( -- f )",
+"text": "True if unparsed characters remain on the line.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"parse-name",
+"parse",
+"in-char",
+"/string",
+"upper"
+],
+"examples": []
+},
+{
+"name": "in-char",
+"stack": "( -- c )",
+"text": "The character at the parse position.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"parse-name",
+"parse",
+"more?",
+"/string",
+"upper"
+],
+"examples": []
+},
+{
+"name": "/string",
+"stack": "( a n k -- a+k n-k )",
+"text": "Remove k characters from the front of a string.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"parse-name",
+"parse",
+"more?",
+"in-char",
+"upper"
+],
+"examples": []
+},
+{
+"name": "upper",
+"stack": "( c -- c' )",
+"text": "Convert a lower-case letter to upper case.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"parse-name",
+"parse",
+"more?",
+"in-char",
+"/string"
+],
+"examples": []
+},
+{
+"name": "find-name",
+"stack": "( a n -- h | 0 )",
+"text": "Find a visible word by name (case-insensitive), newest first.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"match?",
+"same?",
+"name>count",
+"name>xt"
+],
+"examples": []
+},
+{
+"name": "match?",
+"stack": "( h -- f )",
+"text": "True if header h is visible and matches the name in 'a/'n.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"find-name",
+"same?",
+"name>count",
+"name>xt"
+],
+"examples": []
+},
+{
+"name": "same?",
+"stack": "( a1 a2 n -- f )",
+"text": "Compare two strings of length n, case-insensitive.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"find-name",
+"match?",
+"name>count",
+"name>xt"
+],
+"examples": []
+},
+{
+"name": "name>count",
+"stack": "( h -- a n )",
+"text": "Name string of a header.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"find-name",
+"match?",
+"same?",
+"name>xt"
+],
+"examples": []
+},
+{
+"name": "name>xt",
+"stack": "( h -- xt )",
+"text": "Execution token of a header.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"find-name",
+"match?",
+"same?",
+"name>count"
+],
+"examples": []
+},
+{
+"name": "number?",
+"stack": "( a n -- x f )",
+"text": "Convert a string with optional -\"and \"$ prefix; f is true on success.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+">number",
+"digit?",
+"dnumber?",
+">dnumber",
+"d*base+",
+"m+u"
+],
+"examples": []
+},
+{
+"name": ">number",
+"stack": "( acc a n -- acc' a' n' )",
+"text": "Accumulate digits into acc until a non-digit; returns the rest of the string.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"number?",
+"digit?",
+"dnumber?",
+">dnumber",
+"d*base+",
+"m+u"
+],
+"examples": []
+},
+{
+"name": "digit?",
+"stack": "( c -- n f )",
+"text": "Value of a digit character and whether it is valid in base.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"number?",
+">number",
+"dnumber?",
+">dnumber",
+"d*base+",
+"m+u"
+],
+"examples": []
+},
+{
+"name": "dnumber?",
+"stack": "( a n -- lo hi f )",
+"text": "Convert a string with a trailing dot (and an optional $) to an unsigned double number.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"number?",
+">number",
+"digit?",
+">dnumber",
+"d*base+",
+"m+u"
+],
+"examples": []
+},
+{
+"name": ">dnumber",
+"stack": "( lo hi a n -- lo' hi' f )",
+"text": "Accumulate the digits into a double number; f is true if all were digits.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"number?",
+">number",
+"digit?",
+"dnumber?",
+"d*base+",
+"m+u"
+],
+"examples": []
+},
+{
+"name": "d*base+",
+"stack": "( lo hi n -- lo' hi' )",
+"text": "Multiply a double number by base and add n.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"number?",
+">number",
+"digit?",
+"dnumber?",
+">dnumber",
+"m+u"
+],
+"examples": []
+},
+{
+"name": "m+u",
+"stack": "( ud u -- ud' )",
+"text": "Add a single to a double number.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"number?",
+">number",
+"digit?",
+"dnumber?",
+">dnumber",
+"d*base+"
+],
+"examples": []
+},
+{
+"name": "header",
+"stack": "( a n -- )",
+"text": "Lay down a header with this name and make it latest.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"flags!",
+"hide",
+"reveal",
+"compile-call",
+"inline,",
+">resolve"
+],
+"examples": []
+},
+{
+"name": "flags!",
+"stack": "( mask -- )",
+"text": "OR mask into the count byte of latest.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"header",
+"hide",
+"reveal",
+"compile-call",
+"inline,",
+">resolve"
+],
+"examples": []
+},
+{
+"name": "hide",
+"stack": "( -- )",
+"text": "Mark latest\"hidden (used by \":).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"header",
+"flags!",
+"reveal",
+"compile-call",
+"inline,",
+">resolve"
+],
+"examples": []
+},
+{
+"name": "reveal",
+"stack": "( -- )",
+"text": "Clear the hidden flag of latest\"(used by \";).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"header",
+"flags!",
+"hide",
+"compile-call",
+"inline,",
+">resolve"
+],
+"examples": []
+},
+{
+"name": "compile-call",
+"stack": "( xt -- )",
+"text": "Compile a call instruction to xt.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"header",
+"flags!",
+"hide",
+"reveal",
+"inline,",
+">resolve"
+],
+"examples": []
+},
+{
+"name": "inline,",
+"stack": "( xt -- )",
+"text": "Copy xt's instructions up to its return into the definition.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"header",
+"flags!",
+"hide",
+"reveal",
+"compile-call",
+">resolve"
+],
+"examples": []
+},
+{
+"name": ">resolve",
+"stack": "( orig -- )",
+"text": "Patch the jump at orig to point to here\"(used by \"then, else, repeat).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"header",
+"flags!",
+"hide",
+"reveal",
+"compile-call",
+"inline,"
+],
+"examples": []
+},
+{
+"name": "snap",
+"stack": "( -- )",
+"text": "Copy the data stack into ssnap\"and its depth into \"sdepth, leaving the stack as it was; quit runs it before each line, for the app's stack view (section 2.6).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"accept-line",
+"interpret",
+"interpret-word",
+"?stack"
+],
+"examples": []
+},
+{
+"name": "accept-line",
+"stack": "( -- )",
+"text": "Read one line into tib, with echo and backspace (no echo while the saved source is read).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"snap",
+"interpret",
+"interpret-word",
+"?stack"
+],
+"examples": []
+},
+{
+"name": "interpret",
+"stack": "( -- )",
+"text": "Interpret or compile the rest of the line.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"snap",
+"accept-line",
+"interpret-word",
+"?stack"
+],
+"examples": []
+},
+{
+"name": "interpret-word",
+"stack": "( a n -- )",
+"text": "Handle one word: execute, compile, inline, or convert as a number.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"snap",
+"accept-line",
+"interpret",
+"?stack"
+],
+"examples": []
+},
+{
+"name": "?stack",
+"stack": "( -- )",
+"text": "Check for stack underflow or overflow (section 3.4).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"snap",
+"accept-line",
+"interpret",
+"interpret-word"
+],
+"examples": []
+},
+{
+"name": "rx?",
+"stack": "( -- f )",
+"text": "A byte is waiting in the receive FIFO (terminal byte or request).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"soh?",
+"tx"
+],
+"examples": []
+},
+{
+"name": "soh?",
+"stack": "( -- f )",
+"text": "The next byte is a SOH, the start of an app request.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"rx?",
+"tx"
+],
+"examples": []
+},
+{
+"name": "tx",
+"stack": "( c -- )",
+"text": "Send a byte as it is (no doubling of 0x01), answering requests while the send FIFO is full.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [
+"rx?",
+"soh?"
+],
+"examples": [
+"115200. 0 1 0 uart-open   \\ UART 0: TX on D0, RX on D1",
+"115200. 7 7 0 uart-open   \\ UART 0, TX and RX on D7"
+]
+},
+{
+"name": "(free)",
+"stack": "( pin id -- pin )",
+"text": "pin-owner\"(the table, 32 bytes at \"$5E20), (free) ( pin id -- pin )\"(refuses a pin another owner has), \"claim ( pin id -- ), (claim) ( pin id -- pin ), release ( id -- )\"(frees every pin of that owner), \"units-off ( -- )\"(what \"cold\"runs), \"cid\"(the owner being opened), \"uart-a ( u -- a )\"and \"spi-a ( s -- a ) (register addresses;",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "claim",
+"stack": "( pin id -- )",
+"text": "pin-owner\"(the table, 32 bytes at \"$5E20), (free) ( pin id -- pin )\"(refuses a pin another owner has), \"claim ( pin id -- ), (claim) ( pin id -- pin ), release ( id -- )\"(frees every pin of that owner), \"units-off ( -- )\"(what \"cold\"runs), \"cid\"(the owner being opened), \"uart-a ( u -- a )\"and \"spi-a ( s -- a ) (register addresses;",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "(claim)",
+"stack": "( pin id -- pin )",
+"text": "pin-owner\"(the table, 32 bytes at \"$5E20), (free) ( pin id -- pin )\"(refuses a pin another owner has), \"claim ( pin id -- ), (claim) ( pin id -- pin ), release ( id -- )\"(frees every pin of that owner), \"units-off ( -- )\"(what \"cold\"runs), \"cid\"(the owner being opened), \"uart-a ( u -- a )\"and \"spi-a ( s -- a ) (register addresses;",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "release",
+"stack": "( id -- )",
+"text": "pin-owner\"(the table, 32 bytes at \"$5E20), (free) ( pin id -- pin )\"(refuses a pin another owner has), \"claim ( pin id -- ), (claim) ( pin id -- pin ), release ( id -- )\"(frees every pin of that owner), \"units-off ( -- )\"(what \"cold\"runs), \"cid\"(the owner being opened), \"uart-a ( u -- a )\"and \"spi-a ( s -- a ) (register addresses;",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "units-off",
+"stack": "( -- )",
+"text": "pin-owner\"(the table, 32 bytes at \"$5E20), (free) ( pin id -- pin )\"(refuses a pin another owner has), \"claim ( pin id -- ), (claim) ( pin id -- pin ), release ( id -- )\"(frees every pin of that owner), \"units-off ( -- )\"(what \"cold\"runs), \"cid\"(the owner being opened), \"uart-a ( u -- a )\"and \"spi-a ( s -- a ) (register addresses;",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "uart-a",
+"stack": "( u -- a )",
+"text": "pin-owner\"(the table, 32 bytes at \"$5E20), (free) ( pin id -- pin )\"(refuses a pin another owner has), \"claim ( pin id -- ), (claim) ( pin id -- pin ), release ( id -- )\"(frees every pin of that owner), \"units-off ( -- )\"(what \"cold\"runs), \"cid\"(the owner being opened), \"uart-a ( u -- a )\"and \"spi-a ( s -- a ) (register addresses;",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "spi-a",
+"stack": "( s -- a )",
+"text": "pin-owner\"(the table, 32 bytes at \"$5E20), (free) ( pin id -- pin )\"(refuses a pin another owner has), \"claim ( pin id -- ), (claim) ( pin id -- pin ), release ( id -- )\"(frees every pin of that owner), \"units-off ( -- )\"(what \"cold\"runs), \"cid\"(the owner being opened), \"uart-a ( u -- a )\"and \"spi-a ( s -- a ) (register addresses;",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "uart-div",
+"stack": "( ud-baud u -- )",
+"text": "\"bad uart\", \"bad spi\"), uart-div ( ud-baud u -- )\"(sets the divider), \"d2/u ( ud -- ud' )\"(halves a double number), \"spi-ctl ( bits mask s -- )\"(changes control bits), \"(i2c) ( cmd -- status )\"(runs one I2C command and waits) and \"(ack?) ( f -- )\"(stops and reports \" no ack).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "d2/u",
+"stack": "( ud -- ud' )",
+"text": "\"bad uart\", \"bad spi\"), uart-div ( ud-baud u -- )\"(sets the divider), \"d2/u ( ud -- ud' )\"(halves a double number), \"spi-ctl ( bits mask s -- )\"(changes control bits), \"(i2c) ( cmd -- status )\"(runs one I2C command and waits) and \"(ack?) ( f -- )\"(stops and reports \" no ack).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "spi-ctl",
+"stack": "( bits mask s -- )",
+"text": "\"bad uart\", \"bad spi\"), uart-div ( ud-baud u -- )\"(sets the divider), \"d2/u ( ud -- ud' )\"(halves a double number), \"spi-ctl ( bits mask s -- )\"(changes control bits), \"(i2c) ( cmd -- status )\"(runs one I2C command and waits) and \"(ack?) ( f -- )\"(stops and reports \" no ack).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "(i2c)",
+"stack": "( cmd -- status )",
+"text": "\"bad uart\", \"bad spi\"), uart-div ( ud-baud u -- )\"(sets the divider), \"d2/u ( ud -- ud' )\"(halves a double number), \"spi-ctl ( bits mask s -- )\"(changes control bits), \"(i2c) ( cmd -- status )\"(runs one I2C command and waits) and \"(ack?) ( f -- )\"(stops and reports \" no ack).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "(ack?)",
+"stack": "( f -- )",
+"text": "\"bad uart\", \"bad spi\"), uart-div ( ud-baud u -- )\"(sets the divider), \"d2/u ( ud -- ud' )\"(halves a double number), \"spi-ctl ( bits mask s -- )\"(changes control bits), \"(i2c) ( cmd -- status )\"(runs one I2C command and waits) and \"(ack?) ( f -- )\"(stops and reports \" no ack).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "pin-owner",
+"stack": "",
+"text": "Internal: Serial interfaces and pin owners. Serial interfaces and pin owners (section 5.15): pin-owner\"(the table, 32 bytes at \"$5E20), (free) ( pin id -- pin )\"(refuses a pin another owner has), \"claim ( pin id -- ), (claim) ( pin id -- pin ), release ( id -- )\"(frees every pin of t…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "cid",
+"stack": "",
+"text": "Internal: Serial interfaces and pin owners. Serial interfaces and pin owners (section 5.15): pin-owner\"(the table, 32 bytes at \"$5E20), (free) ( pin id -- pin )\"(refuses a pin another owner has), \"claim ( pin id -- ), (claim) ( pin id -- pin ), release ( id -- )\"(frees every pin of t…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "acc-sel",
+"stack": "( -- )",
+"text": "Accelerometer: acc-sel ( -- )\"and \"acc-end ( -- ) select and deselect the LIS3DH;",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "acc-end",
+"stack": "( -- )",
+"text": "Accelerometer: acc-sel ( -- )\"and \"acc-end ( -- ) select and deselect the LIS3DH;",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "mg",
+"stack": "( lo hi -- mg )",
+"text": "mg ( lo hi -- mg ) turns its two output bytes into mg.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "autoload",
+"stack": "( -- )",
+"text": "Saved source. autoload ( -- )\"is what \"cold runs:",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "scan-source",
+"stack": "( -- )",
+"text": "it checks the source (scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an ESC (esc? ( -- f )), reads the button and starts the load ((load) ( len -- )).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "hdr@",
+"stack": "( -- )",
+"text": "it checks the source (scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an ESC (esc? ( -- f )), reads the button and starts the load ((load) ( len -- )).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "hdr-ok?",
+"stack": "( -- f )",
+"text": "it checks the source (scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an ESC (esc? ( -- f )), reads the button and starts the load ((load) ( len -- )).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "text-crc",
+"stack": "( len -- lo hi )",
+"text": "it checks the source (scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an ESC (esc? ( -- f )), reads the button and starts the load ((load) ( len -- )).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "esc?",
+"stack": "( -- f )",
+"text": "it checks the source (scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an ESC (esc? ( -- f )), reads the button and starts the load ((load) ( len -- )).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "(load)",
+"stack": "( len -- )",
+"text": "it checks the source (scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an ESC (esc? ( -- f )), reads the button and starts the load ((load) ( len -- )).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "fkey",
+"stack": "( -- c )",
+"text": "During the load, key\"takes its bytes from \"fkey ( -- c ), which refills lbuf\"256 bytes at a time with \"lfill ( -- ), and echo? ( -- f ) is false.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "lfill",
+"stack": "( -- )",
+"text": "During the load, key\"takes its bytes from \"fkey ( -- c ), which refills lbuf\"256 bytes at a time with \"lfill ( -- ), and echo? ( -- f ) is false.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "echo?",
+"stack": "( -- f )",
+"text": "During the load, key\"takes its bytes from \"fkey ( -- c ), which refills lbuf\"256 bytes at a time with \"lfill ( -- ), and echo? ( -- f ) is false.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "receive",
+"stack": "( len -- f )",
+"text": "store\"uses \"receive ( len -- f ), page-in ( n -- f ), rx-t ( -- c | -1 )\"(a byte within 2 s), \"make-hdr ( flags -- )\"and \"write-hdr ( -- ).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "page-in",
+"stack": "( n -- f )",
+"text": "store\"uses \"receive ( len -- f ), page-in ( n -- f ), rx-t ( -- c | -1 )\"(a byte within 2 s), \"make-hdr ( flags -- )\"and \"write-hdr ( -- ).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "rx-t",
+"stack": "( -- c | -1 )",
+"text": "store\"uses \"receive ( len -- f ), page-in ( n -- f ), rx-t ( -- c | -1 )\"(a byte within 2 s), \"make-hdr ( flags -- )\"and \"write-hdr ( -- ).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "make-hdr",
+"stack": "( flags -- )",
+"text": "store\"uses \"receive ( len -- f ), page-in ( n -- f ), rx-t ( -- c | -1 )\"(a byte within 2 s), \"make-hdr ( flags -- )\"and \"write-hdr ( -- ).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "write-hdr",
+"stack": "( -- )",
+"text": "store\"uses \"receive ( len -- f ), page-in ( n -- f ), rx-t ( -- c | -1 )\"(a byte within 2 s), \"make-hdr ( flags -- )\"and \"write-hdr ( -- ).",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "lbuf",
+"stack": "",
+"text": "Internal: Saved source. Saved source. autoload ( -- )\"is what \"cold\"runs: it checks the source (\"scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an E…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "hdr",
+"stack": "",
+"text": "Internal: Saved source. Saved source. autoload ( -- )\"is what \"cold\"runs: it checks the source (\"scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an E…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "pbuf",
+"stack": "",
+"text": "Internal: Saved source. Saved source. autoload ( -- )\"is what \"cold\"runs: it checks the source (\"scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an E…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "fsrc",
+"stack": "",
+"text": "Internal: Saved source. Saved source. autoload ( -- )\"is what \"cold\"runs: it checks the source (\"scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an E…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "fcr",
+"stack": "",
+"text": "Internal: Saved source. Saved source. autoload ( -- )\"is what \"cold\"runs: it checks the source (\"scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an E…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "loff",
+"stack": "",
+"text": "Internal: Saved source. Saved source. autoload ( -- )\"is what \"cold\"runs: it checks the source (\"scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an E…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "lpos",
+"stack": "",
+"text": "Internal: Saved source. Saved source. autoload ( -- )\"is what \"cold\"runs: it checks the source (\"scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an E…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "lend",
+"stack": "",
+"text": "Internal: Saved source. Saved source. autoload ( -- )\"is what \"cold\"runs: it checks the source (\"scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an E…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "slen",
+"stack": "",
+"text": "Internal: Saved source. Saved source. autoload ( -- )\"is what \"cold\"runs: it checks the source (\"scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an E…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "soff",
+"stack": "",
+"text": "Internal: Saved source. Saved source. autoload ( -- )\"is what \"cold\"runs: it checks the source (\"scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an E…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "dl",
+"stack": "",
+"text": "Internal: Saved source. Saved source. autoload ( -- )\"is what \"cold\"runs: it checks the source (\"scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an E…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "s-state",
+"stack": "",
+"text": "Internal: Saved source. Saved source. autoload ( -- )\"is what \"cold\"runs: it checks the source (\"scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an E…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "s-len",
+"stack": "",
+"text": "Internal: Saved source. Saved source. autoload ( -- )\"is what \"cold\"runs: it checks the source (\"scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an E…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "s-auto",
+"stack": "",
+"text": "Internal: Saved source. Saved source. autoload ( -- )\"is what \"cold\"runs: it checks the source (\"scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an E…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "s-crclo",
+"stack": "",
+"text": "Internal: Saved source. Saved source. autoload ( -- )\"is what \"cold\"runs: it checks the source (\"scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an E…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "s-crchi",
+"stack": "",
+"text": "Internal: Saved source. Saved source. autoload ( -- )\"is what \"cold\"runs: it checks the source (\"scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an E…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "skip1",
+"stack": "",
+"text": "Internal: Saved source. Saved source. autoload ( -- )\"is what \"cold\"runs: it checks the source (\"scan-source ( -- ), which reads the header with hdr@ ( -- ), checks it with hdr-ok? ( -- f )\"and the text with \"text-crc ( len -- lo hi )), waits up to 200 ms for an E…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "service?",
+"stack": "( -- )",
+"text": "service? ( -- ) answers the requests at the head of the receive FIFO;",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "serve",
+"stack": "( -- )",
+"text": "serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- ) picks the answer.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "rq-line",
+"stack": "( -- f )",
+"text": "serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- ) picks the answer.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "dispatch",
+"stack": "( -- )",
+"text": "serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- ) picks the answer.",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "answer",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "answer-n",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "refuse",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "rq-word",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "rq-c",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "rq=",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "=s",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "hexnum",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "hexd",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "hex4",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "hex8",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "lf",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "noop",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "on/off",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "dec16",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "rq-restart",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "rq-source",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "rq-store",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "rq-autostart",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "rq-mem",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "maddr",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "mcells",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "p-echo",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "p-version",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "p-status",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "p-words",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "p-stack",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "p-mem",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "p-board",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "p-source",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "pwm-ctl",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "port-word",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "pwm-word",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "fnx",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "fn2",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "tx-idle",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "serving",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "counting",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "acount",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "rq",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "rq#",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "rq>",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "rqn-a",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "rqn-n",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "ea",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "en",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "rlen",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "rclo",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "rchi",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "rflag",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "pp",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "s-in",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "status",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "dacc",
+"stack": "",
+"text": "Internal: Service requests. Service requests (section 4.8). service? ( -- )\"answers the requests at the head of the receive FIFO; \"serve ( -- )\"reads one (\"rq-line ( -- f )) and dispatch ( -- )\"picks the answer. The others build answers and exist for the app's protoco…",
+"section": "5.25 Internal words",
+"area": "Internal words",
+"related": [],
+"examples": []
+},
+{
+"name": "(dds-hz)",
+"stack": "( ud -- )",
+"text": "dds-hz\"and \"dds-khz\"compute the phase step hz × 2³² / 192,000,000 = hz × 2²⁰ / 46875 by long division, 16 bits at a time with \"um/mod, and round it ((dds-hz) ( ud -- ) takes the frequency in Hz as a double number;",
+"section": "5.14 DDS square-wave generator",
+"area": "DDS square-wave generator",
+"related": [],
+"examples": []
+},
+{
+"name": "dds-d",
+"stack": "",
+"text": "dds-d is the constant 46875).",
+"section": "5.14 DDS square-wave generator",
+"area": "DDS square-wave generator",
+"related": [],
+"examples": []
+}
+]

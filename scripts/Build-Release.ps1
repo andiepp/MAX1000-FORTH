@@ -16,11 +16,11 @@
        CHANGELOG, LICENSE.
 
 .EXAMPLE
-    .\scripts\Build-Release.ps1 -Version 1.4
+    .\scripts\Build-Release.ps1 -Version 1.4.1
 #>
 [CmdletBinding()]
 param(
-    [string]$Version = '1.4',
+    [string]$Version = '1.4.1',
     [switch]$SkipTests,
     [switch]$SkipPdf,
     [switch]$SkipFpga
@@ -50,7 +50,9 @@ try {
         }
     }
 
-    # the app, after the PDFs: it embeds docs\Manual.pdf
+    # the app, after the PDFs: it embeds docs\Manual.pdf and the word help taken from it
+    python tools\make_word_help.py
+    if ($LASTEXITCODE) { throw 'word help failed (a kernel word without a description?)' }
     $appOut = Join-Path $root 'build\app-publish'
     if (-not $SkipTests) {
         dotnet test app\Max1000Forth.slnx

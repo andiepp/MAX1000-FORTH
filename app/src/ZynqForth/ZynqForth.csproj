@@ -24,6 +24,8 @@
   <!-- the user manual (docs/Manual.pdf of this repository), opened by the Manual button -->
   <ItemGroup>
     <EmbeddedResource Include="..\..\..\docs\Manual.pdf" LogicalName="Max1000Forth.Manual.pdf" />
+    <!-- the word help, from the manual's word reference (tools/make_word_help.py writes it) -->
+    <EmbeddedResource Include="Help\words.json" LogicalName="Max1000Forth.WordHelp.json" />
   </ItemGroup>
 
 </Project>

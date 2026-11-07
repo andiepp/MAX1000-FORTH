@@ -19,7 +19,7 @@ One Forth program can be saved in the board's flash, so it runs at every start w
 
 **IDE included.** The MAX1000-FORTH app for Windows combines a source editor and a terminal
 with the data stack and the dictionary, where **See** shows any word decompiled back into
-Forth source. It also shows the saved program and a live view of
+Forth source, and **Help** describes every word, with a search over names and descriptions. It also shows the saved program and a live view of
 the board: LEDs, pins, PWM channels, analog inputs, temperature and tilt. F1 opens the full
 user manual.
 
@@ -41,8 +41,8 @@ manual and implementation details.
 - **Any terminal** (PuTTY, Tera Term) talks to Forth at 115200 baud. The **MAX1000-FORTH
   app** for Windows (in the release zip: `app\Max1000Forth.exe`, no installation) adds an
   editor, the data stack, the dictionary with **See** (any word decompiled back into Forth
-  source), the saved source and a live view of the board: the kernel answers its service
-  requests itself.
+  source), **Help** on every word (searchable, F2 on the word at the cursor), the saved source
+  and a live view of the board: the kernel answers its service requests itself.
 
 ## Get started
 
@@ -131,7 +131,7 @@ python sim\test_serial.py              # simulator tests: UART, SPI, I2C, pin ow
 sim\run_serial.ps1                     # Verilog testbench of UART/SPI/I2C (Vivado 2023.2)
 python tools\hf16.py run forth\kernel.fs -i "2 3 + ."      # the kernel in the simulator
 dotnet test app\Max1000Forth.slnx                             # the app's tests
-scripts\Build-Release.ps1 -Version 1.4                      # release zip in dist\ (with the app)
+scripts\Build-Release.ps1 -Version 1.4.1                    # release zip in dist\ (with the app)
 ```
 
 `build.ps1` finds Quartus via `-Quartus`, `QUARTUS_ROOTDIR` or `<drive>:\Quartus\18.1\quartus`.

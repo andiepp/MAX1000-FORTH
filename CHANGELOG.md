@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.1 — 2026-11-07
+
+- **Help** in the app: a window with every Forth word of the kernel (381 entries), opened with
+  the Help button beside Manual or F2 (on the word at the cursor in the editor or the input
+  line). It stays open while you work; the search covers names, stack effects and
+  descriptions; an area list limits it to one section; each word shows its stack effect,
+  description, manual section, related words and examples. Insert, Copy, Keep on top.
+- The help is taken from the manual's word reference when the app is built
+  (`tools/make_word_help.py`, which also checks that every kernel word is described).
+- Manual: section 2.8 (Help). Firmware unchanged (1.4).
+
 ## 1.4 — 2026-11-06
 
 - **See** in the app: the Dictionary's new See button shows the selected word as Forth

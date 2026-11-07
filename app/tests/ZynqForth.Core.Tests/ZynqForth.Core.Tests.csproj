@@ -19,6 +19,8 @@
   <!-- tools/make_see_fixture.py writes it -->
   <ItemGroup>
     <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+    <!-- the word help the app embeds (tools/make_word_help.py writes it) -->
+    <None Include="..\..\src\ZynqForth\Help\words.json" Link="Help\words.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

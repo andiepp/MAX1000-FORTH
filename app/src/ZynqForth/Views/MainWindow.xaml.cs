@@ -45,6 +45,10 @@ public partial class MainWindow : Window, IUserDialogs
         InputBindings.Add(new KeyBinding(viewModel.Editor.SaveCommand, Key.S, ModifierKeys.Control));
         InputBindings.Add(new KeyBinding(viewModel.RunEditorCommand, Key.F5, ModifierKeys.Control));
         InputBindings.Add(new KeyBinding(new RelayCommand(OpenManual), Key.F1, ModifierKeys.None));
+        InputBindings.Add(new KeyBinding(new RelayCommand(() => OpenHelp(WordAtCaret())), Key.F2, ModifierKeys.None));
+        // the hints of the typing boxes on mouse hover only, not whenever they get the focus
+        ToolTipService.SetShowsToolTipOnKeyboardFocus(InputBox, false);
+        ToolTipService.SetShowsToolTipOnKeyboardFocus(EditorBox, false);
         Loaded += (_, _) => InputBox.Focus();
         SourceInitialized += (_, _) => UpdateTitleBar();
         Skins.Changed += UpdateTitleBar;
@@ -217,6 +221,64 @@ public partial class MainWindow : Window, IUserDialogs
         {
             ViewModel.RunEditorCommand.Execute(text);
         }
+    }
+
+    private HelpWindow? helpWindow;
+
+    private void Help_Click(object sender, RoutedEventArgs e) => OpenHelp(WordAtCaret());
+
+    /// <summary>Opens the help window (one at a time), on a word when one is given.</summary>
+    private void OpenHelp(string? word)
+    {
+        if (helpWindow is null || !helpWindow.IsLoaded)
+        {
+            helpWindow = new HelpWindow(this, name =>
+            {
+                ViewModel.InputLine = (ViewModel.InputLine + " " + name).TrimStart();
+                InputBox.CaretIndex = InputBox.Text.Length;
+            });
+            helpWindow.Closed += (_, _) => helpWindow = null;
+            helpWindow.Show();
+        }
+
+        if (!string.IsNullOrEmpty(word))
+        {
+            helpWindow.ShowWord(word);
+            if (HelpWindow.Help.Find(word) is null && ViewModel.Words.Cast<ForthWord>().Any(w => w.Name.Equals(word, StringComparison.OrdinalIgnoreCase)))
+            {
+                ViewModel.ShowMessage($"{word} is your own word: no help, but See in the Dictionary shows its source.");
+            }
+        }
+        else
+        {
+            helpWindow.Activate();
+        }
+    }
+
+    /// <summary>The word under the caret of the editor or the terminal's input line, if one has the focus.</summary>
+    private string? WordAtCaret()
+    {
+        TextBox? box = Keyboard.FocusedElement as TextBox;
+        if (box != EditorBox && box != InputBox)
+        {
+            return null;
+        }
+
+        string text = box!.Text;
+        int at = Math.Min(box.CaretIndex, text.Length);
+        int start = at, end = at;
+        while (start > 0 && !char.IsWhiteSpace(text[start - 1]))
+        {
+            start--;
+        }
+
+        while (end < text.Length && !char.IsWhiteSpace(text[end]))
+        {
+            end++;
+        }
+
+        string word = text[start..end];
+        return word.Length > 0 ? word : null;
     }
 
     private async void See_Click(object sender, RoutedEventArgs e)
