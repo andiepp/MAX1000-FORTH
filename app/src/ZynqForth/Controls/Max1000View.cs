@@ -7,7 +7,7 @@ using ZynqForth.Themes;
 namespace ZynqForth.Controls;
 
 /// <summary>
-/// The Trenz MAX1000 as MAX1000-FORTH sees it: the 8 user LEDs, the user button, the digital
+/// The Trenz Electronic MAX1000 as MAX1000-FORTH sees it: the 8 user LEDs, the user button, the digital
 /// pins D0..D14 and PIO_01..PIO_08 (level, direction, PWM) and the analog inputs AIN0..AIN7
 /// and AIN. Same size and skin colours as <see cref="BoardView"/>; put it in a Viewbox.
 /// </summary>

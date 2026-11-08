@@ -228,7 +228,7 @@ public sealed class MainViewModel : ObservableObject
     /// <summary>The board is read while it is shown, and for the pattern editor's playing step.</summary>
     private void UpdateBoardTimer() => boardTimer.IsEnabled = (ShowBoard || ShowPattern) && IsConnected;
 
-    /// <summary>The board of the current (or last) connection is a Trenz MAX1000 (MAX1000-FORTH).</summary>
+    /// <summary>The board of the current (or last) connection is a Trenz Electronic MAX1000 (MAX1000-FORTH).</summary>
     public bool IsMax1000 => boardKind == BoardKind.Max1000;
 
     /// <summary>The board is an Arty Z7-20: board view and pattern generator of ZYNQ-FORTH.</summary>

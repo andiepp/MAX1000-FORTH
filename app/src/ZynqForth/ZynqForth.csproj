@@ -9,7 +9,7 @@
     <AssemblyTitle>MAX1000-FORTH</AssemblyTitle>
     <!-- the exe's icon (Explorer, taskbar); app/tools/make_icon.py draws it -->
     <ApplicationIcon>ZynqForth.ico</ApplicationIcon>
-    <Description>MAX1000-FORTH: terminal, editor, dictionary and board view for the HF16 Forth on the Trenz MAX1000.</Description>
+    <Description>MAX1000-FORTH: terminal, editor, dictionary and board view for the HF16 Forth on the Trenz Electronic MAX1000.</Description>
   </PropertyGroup>
 
   <ItemGroup>

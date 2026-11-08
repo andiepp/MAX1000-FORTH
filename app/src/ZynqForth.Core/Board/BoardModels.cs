@@ -2,7 +2,7 @@ using System.Globalization;
 
 namespace ZynqForth.Board;
 
-/// <summary>Which board answers: the Arty Z7-20 (ZYNQ-FORTH) or the Trenz MAX1000 (MAX1000-FORTH).</summary>
+/// <summary>Which board answers: the Arty Z7-20 (ZYNQ-FORTH) or the Trenz Electronic MAX1000 (MAX1000-FORTH).</summary>
 public enum BoardKind { Zynq, Max1000 }
 
 /// <summary>

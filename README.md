@@ -1,11 +1,11 @@
 # MAX1000 FPGA FORTH
 
-**An interactive 16-bit Forth on the Trenz MAX1000**
+**An interactive 16-bit Forth on the Trenz Electronic MAX1000**
 
 ![MAX1000 FPGA FORTH: the hardware in the MAX 10 FPGA and the IDE](docs/images/project-overview.png)
 
 MAX1000 FPGA FORTH puts a complete Forth system into the Intel MAX 10 FPGA of the low-cost
-Trenz MAX1000 board (TEI0001-02). Its CPU, the HF16, is a 16-bit stack machine that runs one
+Trenz Electronic MAX1000 board (TEI0001-02). Its CPU, the HF16, is a 16-bit stack machine that runs one
 Forth primitive per clock at 48 MHz. The Forth kernel is part of the FPGA configuration, so
 the board starts straight into Forth: no soft processor, no loader, and only a USB cable,
 since the programmer is built into the board.

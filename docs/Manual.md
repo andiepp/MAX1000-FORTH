@@ -1,6 +1,6 @@
 # MAX1000-FORTH — User Manual
 
-MAX1000-FORTH is a small interactive Forth system for the Trenz **MAX1000** (TEI0001-02,
+MAX1000-FORTH is a small interactive Forth system for the Trenz Electronic **MAX1000** (TEI0001-02,
 Intel MAX 10 10M08SAU169C8G). Its CPU, the **HF16**, is a 16-bit stack machine built in the FPGA. Every HF16
 instruction is a Forth primitive. There is no soft processor and no second processor:
 the Forth kernel is part of the FPGA configuration, and Forth talks directly over the
@@ -96,7 +96,7 @@ Contents:
 
 ### 1.1 What you need
 
-- A Trenz **MAX1000** (TEI0001-02, with the MAX 10 10M08SAU169C8G) and a micro-USB cable.
+- A Trenz Electronic **MAX1000** (TEI0001-02, with the MAX 10 10M08SAU169C8G) and a micro-USB cable.
   MAX1000-FORTH supports this board only.
 - **No programmer hardware:** the MAX1000 has its programmer on board (an Arrow USB Blaster
   in its USB chip), so the one USB cable writes the FPGA and carries Forth's serial port.

@@ -3,7 +3,7 @@ using System.Globalization;
 namespace ZynqForth.Board;
 
 /// <summary>
-/// The MAX1000-FORTH <c>board</c> answer decoded (Trenz MAX1000, see MAX1000-FORTH's
+/// The MAX1000-FORTH <c>board</c> answer decoded (Trenz Electronic MAX1000, see MAX1000-FORTH's
 /// docs/design.md): the 8 user LEDs, the user button, the digital pins D0..D14 and
 /// PIO_01..PIO_08, the PWM channels and the 9 ADC channels.
 /// </summary>

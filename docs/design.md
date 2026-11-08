@@ -1,6 +1,6 @@
 # MAX1000-FORTH — Implementation Details
 
-This document describes how MAX1000-FORTH is built: the HF16 CPU in the FPGA of a Trenz
+This document describes how MAX1000-FORTH is built: the HF16 CPU in the FPGA of a Trenz Electronic
 MAX1000, its memory, the I/O registers and peripherals around it, the Forth kernel that runs
 on it and answers the app, and the tools that build and check all of it. It is written for
 someone who wants to understand, change or extend the design. How to *use* the Forth is in
@@ -17,7 +17,7 @@ version, `docs/Implementation-Details.pdf`, is generated from this file by
 
 ## 1 Overview
 
-MAX1000-FORTH turns a Trenz MAX1000 (TEI0001-02), a small board with an Intel MAX 10 FPGA,
+MAX1000-FORTH turns a Trenz Electronic MAX1000 (TEI0001-02), a small board with an Intel MAX 10 FPGA,
 into an interactive Forth computer. The Forth runs on **HF16**, a 16-bit stack processor
 built in the FPGA's logic, whose instructions are Forth primitives. Everything that makes
 Forth Forth runs on HF16: reading the input line, looking words up, compiling new
